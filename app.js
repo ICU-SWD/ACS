@@ -1,153 +1,218 @@
 let state = {
-    mode: '12lead', 
-    sync: false, 
-    defibMode: 'monitor',
-    shockTimer: null
+    mode: '12lead', sync: false, defibMode: 'monitor', shockTimer: null, currentX: 0
 };
 
-// สลับโหมดหน้าจอระหว่าง Nihon และ Zoll
+// รายชื่อ Lead มาตรฐาน 12-lead (4 columns x 3 rows)
+const leads12 = [
+    ['I', 'aVR', 'V1', 'V4'],
+    ['II', 'aVL', 'V2', 'V5'],
+    ['III', 'aVF', 'V3', 'V6']
+];
+
+// สมการ Gaussian สำหรับสร้างคลื่นให้โค้งมนสมจริง
+function gaussian(x, a, b, c) {
+    return a * Math.exp(-Math.pow(x - b, 2) / (2 * c * c));
+}
+
+// สร้างรูปร่างคลื่น EKG จาก Phase (0 ถึง 1)
+function getECGValue(phase, rhythm) {
+    let y = 0;
+    if (rhythm === 'asystole') return (Math.random() - 0.5) * 3;
+    if (rhythm === 'vf') return Math.sin(phase * Math.PI * 10) * 15 + Math.sin(phase * Math.PI * 25) * 10 + (Math.random()-0.5)*10;
+    if (rhythm === 'vt') return Math.sin(phase * Math.PI * 5) * 35; // กว้างและเร็ว
+    if (rhythm === 'pea' || rhythm === 'nsr' || rhythm.includes('st') || rhythm.includes('t')) {
+        // P-QRS-T พื้นฐาน
+        y += gaussian(phase, 8, 0.15, 0.02);   // P Wave
+        y += gaussian(phase, -10, 0.28, 0.01); // Q Wave
+        y += gaussian(phase, 45, 0.30, 0.015); // R Wave
+        y += gaussian(phase, -15, 0.32, 0.015);// S Wave
+        
+        // T Wave และความผิดปกติ
+        if (rhythm === 'peak-t') y += gaussian(phase, 30, 0.55, 0.04);
+        else if (rhythm === 't-inv') y += gaussian(phase, -12, 0.55, 0.04);
+        else y += gaussian(phase, 12, 0.55, 0.04); // Normal T
+
+        // ST segment
+        if (rhythm === 'st-elev') {
+            y += gaussian(phase, 20, 0.40, 0.03); 
+            y += gaussian(phase, 15, 0.45, 0.04); // เชื่อมต่อ T
+        } else if (rhythm === 'st-dep') {
+            y += gaussian(phase, -12, 0.40, 0.03);
+        }
+    }
+    return -y; // กลับค่าเพื่อให้กราฟพุ่งขึ้นบน Canvas
+}
+
+function updateSummary() {
+    let hr = document.getElementById('hr-input').value;
+    let bp = document.getElementById('bp-input').value;
+    let rhythm = document.getElementById('rhythm-select').options[document.getElementById('rhythm-select').selectedIndex].text;
+    let defectLeads = document.getElementById('lead-defect').value;
+    
+    let signs = [];
+    if(document.getElementById('sign-loc').checked) signs.push("ซึม/สับสน");
+    if(document.getElementById('sign-hf').checked) signs.push("น้ำท่วมปอด/หอบเหนื่อย");
+    if(document.getElementById('sign-cp').checked) signs.push("เจ็บแน่นหน้าอก");
+    if(document.getElementById('sign-hypo').checked) signs.push("ความดันตก");
+    if(document.getElementById('sign-shock').checked) signs.push("ช็อก/ปลายมือเย็น");
+    
+    let statusHTML = signs.length > 0 
+        ? `<span style="color:#d93025; font-weight:bold;">UNSTABLE</span> (พบ: ${signs.join(', ')})` 
+        : `<span style="color:#0f9d58; font-weight:bold;">STABLE</span>`;
+        
+    document.getElementById('summary-content').innerHTML = `
+        <div style="display:flex; justify-content:space-between;">
+            <span><b>HR:</b> ${hr} bpm | <b>BP:</b> ${bp} mmHg</span>
+            <span><b>Rhythm:</b> ${rhythm} ${defectLeads.toLowerCase() !== 'all' ? `(ที่ Lead: ${defectLeads})` : ''}</span>
+        </div>
+        <div style="margin-top:5px;"><b>สถานะผู้ป่วย:</b> ${statusHTML}</div>
+    `;
+    
+    document.getElementById('display-hr').innerText = hr;
+    document.getElementById('display-bp').innerText = bp;
+}
+
+function drawEKG() {
+    const canvas = document.getElementById('ekg-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    function resizeCanvas() {
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    
+    function render() {
+        // วาดทับแบบจางๆ เพื่อสร้าง Effect คลื่นกวาดหน้าจอ (Monitor Sweep Effect)
+        ctx.fillStyle = state.mode === 'defib' ? 'rgba(17, 17, 17, 0.1)' : 'rgba(255, 255, 255, 0.1)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // ลบเส้นตรงจุดที่กำลังจะวาด (ลบคลื่นเก่า)
+        ctx.clearRect(state.currentX + 2, 0, 10, canvas.height);
+        
+        const hr = parseInt(document.getElementById('hr-input').value) || 80;
+        const mainRhythm = document.getElementById('rhythm-select').value;
+        const defectText = document.getElementById('lead-defect').value.toUpperCase();
+        
+        // คำนวณเฟสของคลื่น
+        let timeInSeconds = (state.currentX * 0.01);
+        let phase = (timeInSeconds * (hr / 60)) % 1; 
+        
+        ctx.lineWidth = 2;
+
+        if(state.mode === 'defib') {
+            // โหมด Defib: แสดง 1 Lead กลางจอใหญ่ๆ
+            ctx.strokeStyle = '#00ff00';
+            ctx.beginPath();
+            let y = (canvas.height / 2) + getECGValue(phase, mainRhythm);
+            ctx.moveTo(state.currentX, y);
+            ctx.lineTo(state.currentX + 2, y);
+            ctx.stroke();
+            
+            // Sync Marker
+            if(state.sync && phase > 0.29 && phase < 0.31) {
+                ctx.fillStyle = 'yellow';
+                ctx.fillRect(state.currentX, y - 30, 4, 15);
+            }
+        } else {
+            // โหมด 12-Lead: แบ่ง Canvas เป็น 3 แถว 4 คอลัมน์
+            ctx.strokeStyle = '#000000';
+            let cellW = canvas.width / 4;
+            let cellH = canvas.height / 3;
+            
+            for(let row = 0; row < 3; row++) {
+                for(let col = 0; col < 4; col++) {
+                    let leadName = leads12[row][col];
+                    // ตรวจสอบว่า Lead นี้ให้แสดงความผิดปกติหรือไม่
+                    let isDefect = defectText === 'ALL' || defectText.includes(leadName);
+                    let rhythmToUse = isDefect ? mainRhythm : 'nsr';
+                    
+                    let yOffset = (row * cellH) + (cellH / 2) + getECGValue(phase, rhythmToUse);
+                    // คำนวณพิกัด X ให้อยู่ในคอลัมน์ของตัวเอง
+                    let localX = (state.currentX % cellW) + (col * cellW);
+                    
+                    // ป้องกันเส้นลากข้ามคอลัมน์
+                    if(state.currentX % cellW === 0) {
+                        ctx.clearRect(col * cellW, row * cellH, cellW, cellH); // เคลียร์ช่องก่อนเริ่มรอบใหม่
+                    }
+
+                    ctx.beginPath();
+                    ctx.moveTo(localX, yOffset);
+                    ctx.lineTo(localX + 2, yOffset);
+                    ctx.stroke();
+                    
+                    // ใส่ชื่อ Lead มุมซ้ายบนของแต่ละช่อง
+                    if(localX === col * cellW) {
+                        ctx.fillStyle = '#005bb5';
+                        ctx.font = '12px Arial';
+                        ctx.fillText(leadName, localX + 5, (row * cellH) + 15);
+                    }
+                }
+            }
+        }
+        
+        state.currentX += 2;
+        if(state.currentX >= canvas.width && state.mode === 'defib') state.currentX = 0;
+        if(state.currentX >= canvas.width / 4 && state.mode === '12lead') state.currentX = 0; // 12-lead รีเซ็ตเร็วกว่าตามขนาดช่อง
+        
+        requestAnimationFrame(render);
+    }
+    render();
+}
+
 function toggleMachine() {
-    const mode = document.getElementById('machine-mode').value;
-    state.mode = mode;
+    state.mode = document.getElementById('machine-mode').value;
     const body = document.getElementById('app-body');
     const defibControls = document.getElementById('defib-controls');
     
-    if(mode === 'defib') {
+    if(state.mode === 'defib') {
         body.className = 'theme-zoll';
         defibControls.style.display = 'block';
     } else {
         body.className = 'theme-nihon';
         defibControls.style.display = 'none';
     }
+    
+    const canvas = document.getElementById('ekg-canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    state.currentX = 0; // รีเซ็ตการลากเส้น
 }
 
-// เลือกโหมดย่อยของ Defib (Monitor, Defib, Pace)
+// ควบคุม Zoll Defib
 function setDefibMode(mode) {
     state.defibMode = mode;
     document.getElementById('defib-sub-panel').style.display = mode === 'defib' ? 'block' : 'none';
     document.getElementById('pace-sub-panel').style.display = mode === 'pace' ? 'block' : 'none';
 }
-
-// เปิด/ปิดโหมด Sync
 function toggleSync() {
     state.sync = !state.sync;
     document.getElementById('sync-status').style.display = state.sync ? 'inline-block' : 'none';
-    document.getElementById('btn-sync').style.background = state.sync ? '#00cc00' : '#555';
+    document.getElementById('btn-sync').style.background = state.sync ? '#0f9d58' : '#005bb5';
 }
-
-// ระบบกดช็อก (รองรับการกดแช่ในโหมด Sync)
 function startShock() {
     const energy = document.getElementById('energy-select').value;
-    
     if(state.sync) {
         document.getElementById('shock-progress').style.display = 'block';
-        // จำลองการกดแช่ 1.5 วินาที เพื่อปล่อยพลังงานในโหมด Sync
         state.shockTimer = setTimeout(() => {
-            deliverShock(energy);
+            alert(`⚡ ปล่อยพลังงานช็อกที่ ${energy} Joules (SYNC)`);
             document.getElementById('shock-progress').style.display = 'none';
         }, 1500);
     } else {
-        deliverShock(energy);
+        alert(`⚡ ปล่อยพลังงานช็อกที่ ${energy} Joules (ASYNC)`);
     }
 }
-
 function cancelShock() {
     if(state.shockTimer && state.sync) {
         clearTimeout(state.shockTimer);
         document.getElementById('shock-progress').style.display = 'none';
     }
 }
+function triggerAction(actionName) { alert(`📝 บันทึกการรักษา: ${actionName}`); }
 
-function deliverShock(energy) {
-    alert(`⚡ ปล่อยพลังงานช็อกที่ ${energy} Joules!`);
-}
-
-// แสดง Feedback ให้ผู้สอน/ผู้เรียนเวลาให้ยาหรือทำ CPR
-function triggerAction(actionName) {
-    // แสดง Alert ง่ายๆ หน้าจอ ไม่ต้องส่งไปหลังบ้าน
-    alert(`ผู้เรียนดำเนินการ: ${actionName}`);
-}
-
-// วาดคลื่น EKG จำลองบน Canvas
-function drawEKG() {
-    const canvas = document.getElementById('ekg-canvas');
-    const ctx = canvas.getContext('2d');
-    
-    // ปรับขนาด Canvas ให้พอดีกับ Container
-    function resizeCanvas() {
-        canvas.width = canvas.parentElement.clientWidth;
-        canvas.height = canvas.parentElement.clientHeight * 0.7;
-    }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-    
-    let x = 0;
-    
-    function render() {
-        // วาดพื้นหลังตามโหมด
-        ctx.fillStyle = state.mode === 'defib' ? '#111' : '#fff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        const hr = parseInt(document.getElementById('hr-input').value) || 80;
-        const rhythm = document.getElementById('rhythm-select').value;
-        
-        ctx.beginPath();
-        ctx.strokeStyle = state.mode === 'defib' ? '#0f0' : '#000';
-        ctx.lineWidth = 2;
-
-        // วาดเส้นกราฟ (คณิตศาสตร์จำลอง)
-        for(let i = 0; i < canvas.width; i++) {
-            let y = canvas.height / 2;
-            let time = (i + x) * (hr / 60) * 0.05; 
-            
-            if(rhythm === 'vf') {
-                y += Math.sin(time * 5) * 40 + Math.random() * 20; 
-            } else if (rhythm === 'vt') {
-                y += Math.sin(time * 3) * 60; 
-            } else if (rhythm === 'asystole') {
-                y += Math.random() * 2; 
-            } else {
-                // โครงสร้าง P-QRS-T พื้นฐาน
-                let phase = time % 10;
-                if(phase > 1 && phase < 1.5) y -= 10; // P wave
-                if(phase > 2 && phase < 2.2) y += 10; // Q
-                
-                if(phase > 2.2 && phase < 2.5) { 
-                    y -= 60; // R wave
-                    // มาร์คเกอร์สีเหลืองสำหรับโหมด Sync
-                    if(state.sync && i % 200 === 0) {
-                        ctx.fillStyle = 'yellow';
-                        ctx.fillRect(i-2, y-20, 4, 10);
-                    }
-                }
-                
-                if(phase > 2.5 && phase < 2.8) y += 20; // S
-                if(phase > 4 && phase < 5) {
-                    y -= (rhythm === 'peak-t' ? 40 : (rhythm === 't-inv' ? -15 : 15)); // T wave
-                }
-                
-                // ความผิดปกติของ ST segment
-                if(rhythm === 'st-elev' && phase > 2.8 && phase < 4) y -= 25;
-                if(rhythm === 'st-dep' && phase > 2.8 && phase < 4) y += 20;
-            }
-            
-            i === 0 ? ctx.moveTo(i, y) : ctx.lineTo(i, y);
-        }
-        ctx.stroke();
-        x += 2; // ความเร็วในการเลื่อนกราฟ
-        requestAnimationFrame(render);
-    }
-    render();
-}
-
-// อัปเดตตัวเลข Vitals Sign บนหน้าจอมอนิเตอร์ทุกๆ 1 วินาที
-setInterval(() => {
-    document.getElementById('display-hr').innerText = document.getElementById('hr-input').value;
-    document.getElementById('display-bp').innerText = document.getElementById('bp-input').value;
-}, 1000);
-
-// เริ่มการทำงานของระบบเมื่อโหลดหน้าเว็บเสร็จ
 window.onload = () => {
+    updateSummary();
     toggleMachine();
     drawEKG();
 };
