@@ -127,7 +127,6 @@
                         <label>Energy (J): <input type="number" id="energy-select" min="50" max="300" step="10" value="200"></label>
                     </div>
                     <div style="text-align: center;">
-                        <!-- การกดช็อกจะส่งประเมินผลไปยังฟังก์ชัน evaluateTreatment -->
                         <button id="btn-shock" onmousedown="startShock()" onmouseup="cancelShock()" class="shock-btn">SHOCK</button>
                     </div>
                     <div id="shock-progress" style="display:none; color:#d93025; font-weight:bold; text-align:center; margin-top:10px;">Charging... Hold button!</div>
@@ -139,8 +138,7 @@
                         <label>Rate: <input type="number" id="pace-rate" value="70"></label><br>
                         <label>Output: <input type="number" id="pace-ma" value="0"> mA</label>
                     </div>
-                    <!-- ปุ่มเริ่ม Pacing เพื่อประเมิน Capture -->
-                    <button class="btn-blue full-width" style="margin-top: 10px; background: #0f9d58;" onclick="evaluateTreatment('Pace')">Start Pacing</button>
+                    <button id="btn-start-pace" class="btn-blue full-width" style="margin-top: 10px; background: #0f9d58;" onclick="togglePacing()">Start Pacing</button>
                 </div>
             </div>
 
