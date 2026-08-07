@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>EKG & ACS Simulator (Pro)</title>
-    <!-- นำเข้าฟอนต์ Prompt จาก Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -34,7 +33,33 @@
                     <option value="pea">PEA</option>
                 </select>
             </label>
-            <label>Lead ผิดปกติ: <input type="text" id="lead-defect" placeholder="เช่น II, III, aVF" value="All" oninput="updateSummary()"></label>
+            
+            <!-- อัปเดต: ระบบเลือก Lead แบบใหม่ -->
+            <label>Lead ผิดปกติ: 
+                <select id="lead-defect-mode" onchange="updateLeadDefectUI(); updateSummary();">
+                    <option value="ALL">ทั้งหมด (All Leads)</option>
+                    <option value="INFERIOR">Inferior (II, III, aVF)</option>
+                    <option value="ANTERIOR">Anterior (V1-V4)</option>
+                    <option value="LATERAL">Lateral (I, aVL, V5, V6)</option>
+                    <option value="CUSTOM">ระบุเอง (Custom Checkbox)</option>
+                </select>
+            </label>
+            <div id="custom-lead-selector" style="display:none; grid-template-columns: repeat(4, 1fr); gap: 5px; font-size:12px; margin-top:5px; background: #e1e8ed; padding: 8px; border-radius: 4px;">
+                <label><input type="checkbox" value="I" onchange="updateSummary()"> I</label>
+                <label><input type="checkbox" value="aVR" onchange="updateSummary()"> aVR</label>
+                <label><input type="checkbox" value="V1" onchange="updateSummary()"> V1</label>
+                <label><input type="checkbox" value="V4" onchange="updateSummary()"> V4</label>
+                
+                <label><input type="checkbox" value="II" onchange="updateSummary()"> II</label>
+                <label><input type="checkbox" value="aVL" onchange="updateSummary()"> aVL</label>
+                <label><input type="checkbox" value="V2" onchange="updateSummary()"> V2</label>
+                <label><input type="checkbox" value="V5" onchange="updateSummary()"> V5</label>
+                
+                <label><input type="checkbox" value="III" onchange="updateSummary()"> III</label>
+                <label><input type="checkbox" value="aVF" onchange="updateSummary()"> aVF</label>
+                <label><input type="checkbox" value="V3" onchange="updateSummary()"> V3</label>
+                <label><input type="checkbox" value="V6" onchange="updateSummary()"> V6</label>
+            </div>
             
             <h4 style="margin-top: 15px;">Unstable Signs</h4>
             <div class="checkbox-group">
@@ -48,9 +73,12 @@
 
         <!-- หน้าจอ Monitor และสรุปอาการ -->
         <div id="center-display">
-            <!-- ส่วนสรุปอาการคนไข้ -->
+            <!-- ส่วนสรุปอาการคนไข้ และปุ่ม Export -->
             <div id="patient-summary" class="panel">
-                <h4 style="margin: 0 0 5px 0; color: #005bb5;">📋 สรุปอาการผู้ป่วย (Patient Summary)</h4>
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid #e1e8ed; padding-bottom: 5px; margin-bottom: 5px;">
+                    <h4 style="margin: 0; color: #005bb5;">📋 สรุปอาการผู้ป่วย (Patient Summary)</h4>
+                    <button class="btn-blue btn-small" onclick="exportEKG()">📸 บันทึก EKG (PNG)</button>
+                </div>
                 <div id="summary-content">กำลังโหลดข้อมูล...</div>
             </div>
 
@@ -108,7 +136,6 @@
             </div>
         </div>
     </div>
-    
     <script src="app.js"></script>
 </body>
 </html>
