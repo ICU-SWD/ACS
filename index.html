@@ -88,6 +88,7 @@
                 <div id="summary-content">กำลังโหลดข้อมูล...</div>
             </div>
 
+            <!-- มอนิเตอร์ที่สามารถ Full Screen ได้ -->
             <div id="monitor-display">
                 <div id="zoll-header" style="display:none;">ZOLL R Series</div>
                 <canvas id="ekg-canvas"></canvas>
@@ -96,6 +97,8 @@
                     <div class="vital-box">BP <span id="display-bp">120/80</span></div>
                     <div id="sync-status" style="display:none; color: yellow;">SYNC</div>
                 </div>
+                <!-- ปุ่มขยายเต็มจอ -->
+                <button id="fullscreen-btn" onclick="toggleFullScreen()">⛶ เต็มจอ</button>
             </div>
         </div>
 
