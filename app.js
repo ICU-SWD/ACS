@@ -13,44 +13,79 @@ function gaussian(x, a, b, c) {
     return a * Math.exp(-Math.pow(x - b, 2) / (2 * c * c));
 }
 
-function getECGValue(phase, rhythm) {
+function getECGValue(phase, rhythm, time, hr) {
     let y = 0;
+    
+    // --- 1. Life-Threatening Arrest Rhythms ---
     if (rhythm === 'asystole') return (Math.random() - 0.5) * 3;
     if (rhythm === 'vf') return Math.sin(phase * Math.PI * 10) * 15 + Math.sin(phase * Math.PI * 22) * 10 + (Math.random()-0.5)*10;
     if (rhythm === 'vt') return Math.sin(phase * Math.PI * 6) * 40; 
-    
-    if (rhythm === 'pea' || rhythm === 'nsr' || rhythm.includes('st') || rhythm.includes('t')) {
-        y += gaussian(phase, 6, 0.15, 0.015);   // P Wave
-        y += gaussian(phase, -12, 0.28, 0.008); // Q Wave
-        y += gaussian(phase, 60, 0.30, 0.01);   // R Wave
-        y += gaussian(phase, -18, 0.32, 0.008); // S Wave
-        
-        if (rhythm === 'peak-t') y += gaussian(phase, 35, 0.55, 0.03);
-        else if (rhythm === 't-inv') y += gaussian(phase, -15, 0.55, 0.03);
-        else y += gaussian(phase, 15, 0.55, 0.03);
-
-        if (rhythm === 'st-elev') {
-            y += gaussian(phase, 25, 0.40, 0.04); 
-            y += gaussian(phase, 15, 0.45, 0.04); 
-        } else if (rhythm === 'st-dep') {
-            y += gaussian(phase, -15, 0.40, 0.04);
-        }
+    if (rhythm === 'tdp') { // Torsades de Pointes
+        let envelope = Math.sin(time * 1.5) * 25 + 15; 
+        return -(Math.sin(time * 25) * envelope + (Math.random()-0.5)*5);
     }
+
+    // --- 2. Wave Coordinates ---
+    let pCenter = 0.15, qCenter = 0.28, rCenter = 0.30, sCenter = 0.32, tCenter = 0.55;
+    let showP = true, showQRS = true, showT = true;
+    let beatIndex = Math.floor(time * (hr / 60)); 
+    
+    // --- 3. Rhythm Logic ---
+    if (rhythm === 'af') {
+        showP = false;
+        y += Math.sin(time * 25) * 2 + Math.sin(time * 15) * 3 + (Math.random()-0.5)*2; // Fibrillatory baseline
+    } else if (rhythm === 'aflutter') {
+        showP = false;
+        y += Math.sin(time * 18) * 6 + Math.cos(time * 36) * 3; // Sawtooth baseline
+    } else if (rhythm === 'svt') {
+        showP = false; // P wave hidden in fast rate
+    } else if (rhythm === '1st-avb') {
+        pCenter = 0.05; // PR Prolonged
+    } else if (rhythm === '2nd-avb-1') { // Wenckebach (4-beat cycle)
+        let cycle = beatIndex % 4;
+        if (cycle === 0) pCenter = 0.15;
+        if (cycle === 1) pCenter = 0.10;
+        if (cycle === 2) pCenter = 0.05;
+        if (cycle === 3) { showQRS = false; showT = false; }
+    } else if (rhythm === '2nd-avb-2') { // Mobitz II (Drop every 3rd beat)
+        if (beatIndex % 3 === 2) { showQRS = false; showT = false; }
+    } else if (rhythm === '3rd-avb') {
+        showP = false; 
+        let pPhase = (time * (80 / 60)) % 1; // P wave at independent 80 bpm
+        y += gaussian(pPhase, 6, 0.15, 0.015);
+    }
+
+    // --- 4. Draw Components ---
+    if (showP) y += gaussian(phase, 6, pCenter, 0.015);
+    
+    if (showQRS) {
+        y += gaussian(phase, -12, qCenter, 0.008); 
+        y += gaussian(phase, 60, rCenter, 0.01); // Normal R wave height is 60
+        y += gaussian(phase, -18, sCenter, 0.008); 
+    }
+    
+    if (showT) {
+        // อัปเดต Tall Peak T ให้สูงกว่า R wave อย่างชัดเจน
+        if (rhythm === 'peak-t') y += gaussian(phase, 85, tCenter, 0.035); 
+        else if (rhythm === 't-inv') y += gaussian(phase, -15, tCenter, 0.03);
+        else y += gaussian(phase, 15, tCenter, 0.03);
+    }
+
+    if (showQRS && rhythm === 'st-elev') {
+        y += gaussian(phase, 25, 0.40, 0.04); y += gaussian(phase, 15, 0.45, 0.04); 
+    } else if (showQRS && rhythm === 'st-dep') {
+        y += gaussian(phase, -15, 0.40, 0.04);
+    }
+
     return -y; 
 }
 
-// จัดการ UI สำหรับเลือก Lead
+// UI & Data Management
 function updateLeadDefectUI() {
     const mode = document.getElementById('lead-defect-mode').value;
-    const customDiv = document.getElementById('custom-lead-selector');
-    if(mode === 'CUSTOM') {
-        customDiv.style.display = 'grid';
-    } else {
-        customDiv.style.display = 'none';
-    }
+    document.getElementById('custom-lead-selector').style.display = mode === 'CUSTOM' ? 'grid' : 'none';
 }
 
-// ดึงค่า Lead ที่ผิดปกติ
 function getDefectiveLeads() {
     const mode = document.getElementById('lead-defect-mode').value;
     if(mode === 'ALL') return ['ALL'];
@@ -79,7 +114,6 @@ function updateSummary() {
     let bp = document.getElementById('bp-input').value;
     let rhythm = document.getElementById('rhythm-select').options[document.getElementById('rhythm-select').selectedIndex].text;
     
-    // แปลงอาร์เรย์ Lead ที่ผิดปกติเป็นข้อความ
     let defLeads = getDefectiveLeads();
     let defectString = defLeads.includes('ALL') ? 'All Leads' : defLeads.join(', ');
     if(defectString === '') defectString = 'None';
@@ -113,7 +147,7 @@ function updateSummary() {
     document.getElementById('display-bp').innerText = bp;
 }
 
-// ฟังก์ชันสำหรับบันทึกภาพ EKG เป็น PNG พร้อมเส้นตาราง
+// ระบบ Export ภาพ EKG
 function exportEKG() {
     const canvas = document.getElementById('ekg-canvas');
     const exportCanvas = document.createElement('canvas');
@@ -121,12 +155,9 @@ function exportEKG() {
     exportCanvas.height = canvas.height;
     const eCtx = exportCanvas.getContext('2d');
 
-    // เติมสีพื้นหลังตามโหมด
     if (state.mode === '12lead') {
         eCtx.fillStyle = '#ffffff';
         eCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-        
-        // วาดเส้นตารางกริด 12 Lead (จำลอง CSS Background)
         eCtx.lineWidth = 1;
         for(let x = 0; x < exportCanvas.width; x += 10) {
             eCtx.beginPath(); eCtx.moveTo(x, 0); eCtx.lineTo(x, exportCanvas.height);
@@ -143,10 +174,7 @@ function exportEKG() {
         eCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
     }
 
-    // วางคลื่น EKG จากจอลงไปทับ
     eCtx.drawImage(canvas, 0, 0);
-
-    // บันทึกไฟล์ลงเครื่อง
     const rhythmName = document.getElementById('rhythm-select').options[document.getElementById('rhythm-select').selectedIndex].text;
     const hr = document.getElementById('hr-input').value;
     const link = document.createElement('a');
@@ -155,6 +183,7 @@ function exportEKG() {
     link.click();
 }
 
+// Rendering Engine
 function drawEKG() {
     const canvas = document.getElementById('ekg-canvas');
     const ctx = canvas.getContext('2d');
@@ -165,9 +194,7 @@ function drawEKG() {
         let displayWidth = canvas.parentElement.clientWidth;
         let displayHeight = canvas.parentElement.clientHeight;
         if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
-            canvas.width = displayWidth;
-            canvas.height = displayHeight;
-            state.currentX = 0;
+            canvas.width = displayWidth; canvas.height = displayHeight; state.currentX = 0;
         }
 
         const hr = parseInt(document.getElementById('hr-input').value) || 80;
@@ -183,35 +210,27 @@ function drawEKG() {
             
             if (state.currentX >= canvas.width) {
                 state.currentX = 0;
-                state.lastY = null;
-                state.lastY_12.fill(null);
-                state.lastY_II = null;
+                state.lastY = null; state.lastY_12.fill(null); state.lastY_II = null;
             }
             
             let phase = (state.time * (hr / 60)) % 1; 
-            ctx.clearRect(state.currentX, 0, 15, canvas.height); // ยางลบ
+            ctx.clearRect(state.currentX, 0, 15, canvas.height); 
             
             if(state.mode === 'defib') {
                 ctx.strokeStyle = '#00ff00';
-                let y = (canvas.height / 2) + getECGValue(phase, mainRhythm);
+                let y = (canvas.height / 2) + getECGValue(phase, mainRhythm, state.time, hr);
                 
                 if (state.currentX > 0 && state.lastY !== null) {
-                    ctx.beginPath();
-                    ctx.moveTo(state.currentX - 1, state.lastY);
-                    ctx.lineTo(state.currentX, y);
-                    ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(state.currentX - 1, state.lastY); ctx.lineTo(state.currentX, y); ctx.stroke();
                 }
                 state.lastY = y;
                 
                 if(state.sync && phase > 0.29 && phase < 0.31) {
-                    ctx.fillStyle = 'yellow';
-                    ctx.fillRect(state.currentX, y - 30, 2, 15);
+                    ctx.fillStyle = 'yellow'; ctx.fillRect(state.currentX, y - 30, 2, 15);
                 }
             } else {
                 ctx.strokeStyle = '#333333';
-                let cellW = canvas.width / 4;
-                let cellH = canvas.height / 4; 
-                
+                let cellW = canvas.width / 4; let cellH = canvas.height / 4; 
                 let col = Math.floor(state.currentX / cellW);
                 let prevCol = Math.floor((state.currentX - 1) / cellW);
                 let crossBoundary = col !== prevCol; 
@@ -221,46 +240,34 @@ function drawEKG() {
                     let leadName = leads12[row][col];
                     let isDefect = defectLeadsList.includes('ALL') || defectLeadsList.includes(leadName);
                     let rhythmToUse = isDefect ? mainRhythm : 'nsr';
-                    let yOffset = (row * cellH) + (cellH / 2) + getECGValue(phase, rhythmToUse);
+                    let yOffset = (row * cellH) + (cellH / 2) + getECGValue(phase, rhythmToUse, state.time, hr);
                     
                     if (!crossBoundary && state.currentX > 0 && state.lastY_12[row] !== null) {
-                        ctx.beginPath();
-                        ctx.moveTo(state.currentX - 1, state.lastY_12[row]);
-                        ctx.lineTo(state.currentX, yOffset);
-                        ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(state.currentX - 1, state.lastY_12[row]); ctx.lineTo(state.currentX, yOffset); ctx.stroke();
                     }
                     state.lastY_12[row] = yOffset;
                 }
 
                 let isDefectII = defectLeadsList.includes('ALL') || defectLeadsList.includes('II');
-                let yOffsetII = (3 * cellH) + (cellH / 2) + getECGValue(phase, isDefectII ? mainRhythm : 'nsr');
+                let yOffsetII = (3 * cellH) + (cellH / 2) + getECGValue(phase, isDefectII ? mainRhythm : 'nsr', state.time, hr);
                 if (state.currentX > 0 && state.lastY_II !== null) {
-                    ctx.beginPath();
-                    ctx.moveTo(state.currentX - 1, state.lastY_II);
-                    ctx.lineTo(state.currentX, yOffsetII);
-                    ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(state.currentX - 1, state.lastY_II); ctx.lineTo(state.currentX, yOffsetII); ctx.stroke();
                 }
                 state.lastY_II = yOffsetII;
             }
         }
         
-        // วาดชื่อ Lead ทับไว้เสมอ
         if (state.mode === 'defib') {
-            ctx.fillStyle = '#0f0';
-            ctx.font = 'bold 18px Prompt';
-            ctx.fillText('Lead II', 15, 30);
+            ctx.fillStyle = '#0f0'; ctx.font = 'bold 18px Prompt'; ctx.fillText('Lead II', 15, 30);
         } else {
-            let cellW = canvas.width / 4;
-            let cellH = canvas.height / 4; 
+            let cellW = canvas.width / 4; let cellH = canvas.height / 4; 
             ctx.font = 'bold 14px Prompt';
             for(let c = 0; c < 4; c++) {
                 for(let r = 0; r < 3; r++) {
-                    ctx.fillStyle = '#005bb5';
-                    ctx.fillText(leads12[r][c], (c * cellW) + 10, (r * cellH) + 25);
+                    ctx.fillStyle = '#005bb5'; ctx.fillText(leads12[r][c], (c * cellW) + 10, (r * cellH) + 25);
                 }
             }
-            ctx.fillStyle = '#d93025';
-            ctx.fillText('II (Rhythm Strip)', 10, (3 * cellH) + 25);
+            ctx.fillStyle = '#d93025'; ctx.fillText('II (Rhythm Strip)', 10, (3 * cellH) + 25);
         }
     }
     render();
@@ -274,18 +281,13 @@ function toggleMachine() {
     const ctx = canvas.getContext('2d');
     
     if(state.mode === 'defib') {
-        body.className = 'theme-zoll';
-        defibControls.style.display = 'block';
+        body.className = 'theme-zoll'; defibControls.style.display = 'block';
     } else {
-        body.className = 'theme-nihon';
-        defibControls.style.display = 'none';
+        body.className = 'theme-nihon'; defibControls.style.display = 'none';
     }
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    state.currentX = 0; 
-    state.lastY = null;
-    state.lastY_12.fill(null);
-    state.lastY_II = null;
+    state.currentX = 0; state.lastY = null; state.lastY_12.fill(null); state.lastY_II = null;
 }
 
 function setDefibMode(mode) {
@@ -319,7 +321,5 @@ function cancelShock() {
 function triggerAction(actionName) { alert(`📝 บันทึกการรักษา: ${actionName}`); }
 
 window.onload = () => {
-    updateSummary();
-    drawEKG(); 
-    toggleMachine();
+    updateSummary(); drawEKG(); toggleMachine();
 };
