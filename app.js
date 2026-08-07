@@ -39,6 +39,31 @@ function getECGValue(phase, rhythm) {
     return -y; 
 }
 
+// จัดการ UI สำหรับเลือก Lead
+function updateLeadDefectUI() {
+    const mode = document.getElementById('lead-defect-mode').value;
+    const customDiv = document.getElementById('custom-lead-selector');
+    if(mode === 'CUSTOM') {
+        customDiv.style.display = 'grid';
+    } else {
+        customDiv.style.display = 'none';
+    }
+}
+
+// ดึงค่า Lead ที่ผิดปกติ
+function getDefectiveLeads() {
+    const mode = document.getElementById('lead-defect-mode').value;
+    if(mode === 'ALL') return ['ALL'];
+    if(mode === 'INFERIOR') return ['II', 'III', 'aVF'];
+    if(mode === 'ANTERIOR') return ['V1', 'V2', 'V3', 'V4'];
+    if(mode === 'LATERAL') return ['I', 'aVL', 'V5', 'V6'];
+    if(mode === 'CUSTOM') {
+        let checks = document.querySelectorAll('#custom-lead-selector input:checked');
+        return Array.from(checks).map(cb => cb.value);
+    }
+    return [];
+}
+
 function toggleRhythmDisplay() {
     const el = document.getElementById('rhythm-display');
     const btn = document.getElementById('btn-show-rhythm');
@@ -53,7 +78,11 @@ function updateSummary() {
     let hr = document.getElementById('hr-input').value;
     let bp = document.getElementById('bp-input').value;
     let rhythm = document.getElementById('rhythm-select').options[document.getElementById('rhythm-select').selectedIndex].text;
-    let defectLeads = document.getElementById('lead-defect').value;
+    
+    // แปลงอาร์เรย์ Lead ที่ผิดปกติเป็นข้อความ
+    let defLeads = getDefectiveLeads();
+    let defectString = defLeads.includes('ALL') ? 'All Leads' : defLeads.join(', ');
+    if(defectString === '') defectString = 'None';
     
     let signs = [];
     if(document.getElementById('sign-loc').checked) signs.push("ซึม/สับสน");
@@ -72,7 +101,7 @@ function updateSummary() {
             <span>
                 <b>Rhythm:</b> 
                 <span id="rhythm-display" style="display:none; color:#d93025; font-weight:bold;">
-                    ${rhythm} ${defectLeads.toLowerCase() !== 'all' ? `(ที่ Lead: ${defectLeads})` : ''}
+                    ${rhythm} ${defectString !== 'All Leads' && defectString !== 'None' ? `(พบที่: ${defectString})` : ''}
                 </span>
                 <button id="btn-show-rhythm" class="btn-blue btn-small" style="margin-left:8px;" onclick="toggleRhythmDisplay()">แสดง</button>
             </span>
@@ -84,6 +113,48 @@ function updateSummary() {
     document.getElementById('display-bp').innerText = bp;
 }
 
+// ฟังก์ชันสำหรับบันทึกภาพ EKG เป็น PNG พร้อมเส้นตาราง
+function exportEKG() {
+    const canvas = document.getElementById('ekg-canvas');
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = canvas.width;
+    exportCanvas.height = canvas.height;
+    const eCtx = exportCanvas.getContext('2d');
+
+    // เติมสีพื้นหลังตามโหมด
+    if (state.mode === '12lead') {
+        eCtx.fillStyle = '#ffffff';
+        eCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+        
+        // วาดเส้นตารางกริด 12 Lead (จำลอง CSS Background)
+        eCtx.lineWidth = 1;
+        for(let x = 0; x < exportCanvas.width; x += 10) {
+            eCtx.beginPath(); eCtx.moveTo(x, 0); eCtx.lineTo(x, exportCanvas.height);
+            eCtx.strokeStyle = (x % 50 === 0) ? 'rgba(255, 0, 0, 0.4)' : 'rgba(255, 192, 203, 0.6)';
+            eCtx.stroke();
+        }
+        for(let y = 0; y < exportCanvas.height; y += 10) {
+            eCtx.beginPath(); eCtx.moveTo(0, y); eCtx.lineTo(exportCanvas.width, y);
+            eCtx.strokeStyle = (y % 50 === 0) ? 'rgba(255, 0, 0, 0.4)' : 'rgba(255, 192, 203, 0.6)';
+            eCtx.stroke();
+        }
+    } else {
+        eCtx.fillStyle = '#111111';
+        eCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+    }
+
+    // วางคลื่น EKG จากจอลงไปทับ
+    eCtx.drawImage(canvas, 0, 0);
+
+    // บันทึกไฟล์ลงเครื่อง
+    const rhythmName = document.getElementById('rhythm-select').options[document.getElementById('rhythm-select').selectedIndex].text;
+    const hr = document.getElementById('hr-input').value;
+    const link = document.createElement('a');
+    link.download = `EKG_${state.mode}_${rhythmName}_${hr}BPM.png`;
+    link.href = exportCanvas.toDataURL('image/png');
+    link.click();
+}
+
 function drawEKG() {
     const canvas = document.getElementById('ekg-canvas');
     const ctx = canvas.getContext('2d');
@@ -91,7 +162,6 @@ function drawEKG() {
     function render() {
         requestAnimationFrame(render);
         
-        // ทำให้แน่ใจว่าขนาด Canvas ตรงกับหน้าจอเสมอ (ป้องกัน EKG สั้น)
         let displayWidth = canvas.parentElement.clientWidth;
         let displayHeight = canvas.parentElement.clientHeight;
         if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
@@ -102,14 +172,14 @@ function drawEKG() {
 
         const hr = parseInt(document.getElementById('hr-input').value) || 80;
         const mainRhythm = document.getElementById('rhythm-select').value;
-        const defectText = document.getElementById('lead-defect').value.toUpperCase();
+        const defectLeadsList = getDefectiveLeads();
         
-        let speed = 2; // ความเร็วในการกวาด (พิกเซลต่อเฟรม)
+        let speed = 2; 
         ctx.lineWidth = 2;
 
         for (let i = 0; i < speed; i++) {
             state.currentX++;
-            state.time += 0.004; // สเกลเวลา (ยิ่งน้อยคลื่นยิ่งกว้าง)
+            state.time += 0.004; 
             
             if (state.currentX >= canvas.width) {
                 state.currentX = 0;
@@ -119,15 +189,12 @@ function drawEKG() {
             }
             
             let phase = (state.time * (hr / 60)) % 1; 
-            
-            // ยางลบ (ลบเส้นล่วงหน้า 15 พิกเซล)
-            ctx.clearRect(state.currentX, 0, 15, canvas.height);
+            ctx.clearRect(state.currentX, 0, 15, canvas.height); // ยางลบ
             
             if(state.mode === 'defib') {
                 ctx.strokeStyle = '#00ff00';
                 let y = (canvas.height / 2) + getECGValue(phase, mainRhythm);
                 
-                // วาดเส้นแบบ Pixel-by-Pixel ต่อเนื่อง
                 if (state.currentX > 0 && state.lastY !== null) {
                     ctx.beginPath();
                     ctx.moveTo(state.currentX - 1, state.lastY);
@@ -141,19 +208,18 @@ function drawEKG() {
                     ctx.fillRect(state.currentX, y - 30, 2, 15);
                 }
             } else {
-                // โหมด 12-Lead
                 ctx.strokeStyle = '#333333';
                 let cellW = canvas.width / 4;
                 let cellH = canvas.height / 4; 
                 
                 let col = Math.floor(state.currentX / cellW);
                 let prevCol = Math.floor((state.currentX - 1) / cellW);
-                let crossBoundary = col !== prevCol; // ป้องกันเส้นลากข้ามคอลัมน์
+                let crossBoundary = col !== prevCol; 
                 if (col > 3) col = 3;
                 
                 for(let row = 0; row < 3; row++) {
                     let leadName = leads12[row][col];
-                    let isDefect = defectText === 'ALL' || defectText.includes(leadName);
+                    let isDefect = defectLeadsList.includes('ALL') || defectLeadsList.includes(leadName);
                     let rhythmToUse = isDefect ? mainRhythm : 'nsr';
                     let yOffset = (row * cellH) + (cellH / 2) + getECGValue(phase, rhythmToUse);
                     
@@ -166,8 +232,7 @@ function drawEKG() {
                     state.lastY_12[row] = yOffset;
                 }
 
-                // แถวล่างสุด Rhythm Strip (Lead II ยาวตลอดแนว)
-                let isDefectII = defectText === 'ALL' || defectText.includes('II');
+                let isDefectII = defectLeadsList.includes('ALL') || defectLeadsList.includes('II');
                 let yOffsetII = (3 * cellH) + (cellH / 2) + getECGValue(phase, isDefectII ? mainRhythm : 'nsr');
                 if (state.currentX > 0 && state.lastY_II !== null) {
                     ctx.beginPath();
@@ -179,7 +244,7 @@ function drawEKG() {
             }
         }
         
-        // วาดตัวหนังสือทับเสมอเพื่อไม่ให้ยางลบลบหายไป
+        // วาดชื่อ Lead ทับไว้เสมอ
         if (state.mode === 'defib') {
             ctx.fillStyle = '#0f0';
             ctx.font = 'bold 18px Prompt';
@@ -255,6 +320,6 @@ function triggerAction(actionName) { alert(`📝 บันทึกการร�
 
 window.onload = () => {
     updateSummary();
-    drawEKG(); // เรียกครั้งเดียวพอ
+    drawEKG(); 
     toggleMachine();
 };
