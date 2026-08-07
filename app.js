@@ -1,7 +1,7 @@
 let state = {
     mode: '12lead', sync: false, defibMode: 'monitor', shockTimer: null, 
     currentX: 0, time: 0, lastY: null, lastY_12: Array(3).fill(null), lastY_II: null,
-    beatPhase: 0, beatIndex: 0, phaseMultiplier: 1 // ตัวแปรสำหรับคุมความผิดปกติ AF/AV Block
+    beatPhase: 0, beatIndex: 0, phaseMultiplier: 1
 };
 
 const leads12 = [
@@ -14,50 +14,44 @@ function gaussian(x, a, b, c) {
     return a * Math.exp(-Math.pow(x - b, 2) / (2 * c * c));
 }
 
-// อัปเดตสมการคลื่น EKG รองรับ AF Irregular, SVT Merged P+T, Tall Peak T
 function getECGValue(phase, rhythm, time, hr, beatIndex) {
     let y = 0;
-    
-    // --- 1. ภาวะหัวใจหยุดเต้น ---
     if (rhythm === 'asystole') return (Math.random() - 0.5) * 3;
     if (rhythm === 'vf') return Math.sin(phase * Math.PI * 10) * 15 + Math.sin(phase * Math.PI * 22) * 10 + (Math.random()-0.5)*10;
     if (rhythm === 'vt') return Math.sin(phase * Math.PI * 6) * 40; 
-    if (rhythm === 'tdp') { // Torsades de Pointes
+    if (rhythm === 'tdp') { 
         let envelope = Math.sin(time * 1.5) * 25 + 15; 
         return -(Math.sin(time * 25) * envelope + (Math.random()-0.5)*5);
     }
 
-    // --- 2. พิกัดปกติของ P-QRS-T ---
     let pCenter = 0.15, qCenter = 0.28, rCenter = 0.30, sCenter = 0.32, tCenter = 0.55;
     let showP = true, showQRS = true, showT = true;
     
-    // --- 3. ตรรกะความผิดปกติของจังหวะ (Arrhythmias) ---
     if (rhythm === 'af') {
-        showP = false; // ไม่มี P Wave
-        y += Math.sin(time * 25) * 2 + Math.sin(time * 15) * 3 + (Math.random()-0.5)*2; // เส้นฐานแกว่ง
+        showP = false; 
+        y += Math.sin(time * 25) * 2 + Math.sin(time * 15) * 3 + (Math.random()-0.5)*2; 
     } else if (rhythm === 'aflutter') {
         showP = false;
-        y += Math.sin(time * 18) * 6 + Math.cos(time * 36) * 3; // เส้นฐานฟันเลื่อย
+        y += Math.sin(time * 18) * 6 + Math.cos(time * 36) * 3; 
     } else if (rhythm === 'svt') {
         showP = false; 
-        tCenter = 0.80; // ย้าย P+T wave มาตรงกลางเป๊ะๆ ระหว่าง QRS สองตัว
+        tCenter = 0.80; 
     } else if (rhythm === '1st-avb') {
-        pCenter = 0.05; // PR ยาว
-    } else if (rhythm === '2nd-avb-1') { // Wenckebach
+        pCenter = 0.05; 
+    } else if (rhythm === '2nd-avb-1') { 
         let cycle = beatIndex % 4;
         if (cycle === 0) pCenter = 0.15;
         if (cycle === 1) pCenter = 0.10;
         if (cycle === 2) pCenter = 0.05;
         if (cycle === 3) { showQRS = false; showT = false; }
-    } else if (rhythm === '2nd-avb-2') { // Mobitz II
+    } else if (rhythm === '2nd-avb-2') { 
         if (beatIndex % 3 === 2) { showQRS = false; showT = false; }
     } else if (rhythm === '3rd-avb') {
         showP = false; 
-        let pPhase = (time * (80 / 60)) % 1; // P wave เต้นแยกอิสระ 80 ครั้ง/นาที
+        let pPhase = (time * (80 / 60)) % 1; 
         y += gaussian(pPhase, 6, 0.15, 0.015);
     }
 
-    // --- 4. วาดคลื่น ---
     if (showP) y += gaussian(phase, 6, pCenter, 0.015);
     
     if (showQRS) {
@@ -67,9 +61,9 @@ function getECGValue(phase, rhythm, time, hr, beatIndex) {
     }
     
     if (showT) {
-        if (rhythm === 'peak-t') y += gaussian(phase, 85, tCenter, 0.035); // สูงทะลุ R wave
+        if (rhythm === 'peak-t') y += gaussian(phase, 85, tCenter, 0.035); 
         else if (rhythm === 't-inv') y += gaussian(phase, -15, tCenter, 0.03);
-        else if (rhythm === 'svt') y += gaussian(phase, 20, tCenter, 0.025); // P+T ยอดแหลมชัดๆ
+        else if (rhythm === 'svt') y += gaussian(phase, 20, tCenter, 0.025); 
         else y += gaussian(phase, 15, tCenter, 0.03);
     }
 
@@ -82,7 +76,6 @@ function getECGValue(phase, rhythm, time, hr, beatIndex) {
     return -y; 
 }
 
-// UI & Data Management
 function updateLeadDefectUI() {
     const mode = document.getElementById('lead-defect-mode').value;
     document.getElementById('custom-lead-selector').style.display = mode === 'CUSTOM' ? 'grid' : 'none';
@@ -149,7 +142,6 @@ function updateSummary() {
     document.getElementById('display-bp').innerText = bp;
 }
 
-// ระบบ Export ภาพ EKG
 function exportEKG() {
     const canvas = document.getElementById('ekg-canvas');
     const exportCanvas = document.createElement('canvas');
@@ -183,7 +175,31 @@ function exportEKG() {
     link.click();
 }
 
-// Rendering Engine (ปรับปรุงระบบนับเวลา AF Irregularity)
+// ฟังก์ชันเปิด/ปิดโหมดเต็มหน้าจอ (Full Screen)
+function toggleFullScreen() {
+    const elem = document.getElementById("monitor-display");
+    const btn = document.getElementById("fullscreen-btn");
+    
+    if (!document.fullscreenElement) {
+        if (elem.requestFullscreen) { elem.requestFullscreen(); } 
+        else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); } 
+        else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
+        btn.innerText = "ย่อจอ";
+    } else {
+        if (document.exitFullscreen) { document.exitFullscreen(); } 
+        else if (document.webkitExitFullscreen) { document.webkitExitFullscreen(); } 
+        else if (document.msExitFullscreen) { document.msExitFullscreen(); }
+        btn.innerText = "⛶ เต็มจอ";
+    }
+}
+
+// อัปเดตข้อความปุ่มเมื่อผู้ใช้ออก Full Screen ผ่านปุ่ม ESC 
+document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement) {
+        document.getElementById("fullscreen-btn").innerText = "⛶ เต็มจอ";
+    }
+});
+
 function drawEKG() {
     const canvas = document.getElementById('ekg-canvas');
     const ctx = canvas.getContext('2d');
@@ -206,17 +222,16 @@ function drawEKG() {
 
         for (let i = 0; i < speed; i++) {
             state.currentX++;
-            state.time += 0.004; // เวลามาตรฐานสำหรับ Fibrillatory Baseline
+            state.time += 0.004; 
             
             if (state.currentX >= canvas.width) {
                 state.currentX = 0;
                 state.lastY = null; state.lastY_12.fill(null); state.lastY_II = null;
             }
             
-            // การคำนวณ Phase รองรับ AF Irregular
             let baseStep = (hr / 60) * 0.004;
             if (mainRhythm === 'af') {
-                baseStep *= (state.phaseMultiplier || 1); // คูณตัวสุ่มให้ช้าหรือเร็ว
+                baseStep *= (state.phaseMultiplier || 1); 
             }
 
             state.beatPhase += baseStep;
@@ -224,7 +239,6 @@ function drawEKG() {
                 state.beatPhase -= 1;
                 state.beatIndex++;
                 if (mainRhythm === 'af') {
-                    // สุ่มความยาวของ R-R รอบถัดไป (0.6x ถึง 1.5x)
                     state.phaseMultiplier = 0.6 + Math.random() * 0.9;
                 } else {
                     state.phaseMultiplier = 1;
@@ -306,7 +320,7 @@ function toggleMachine() {
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     state.currentX = 0; state.lastY = null; state.lastY_12.fill(null); state.lastY_II = null;
-    state.beatPhase = 0; // รีเซ็ตรอบใหม่
+    state.beatPhase = 0; 
 }
 
 function setDefibMode(mode) {
