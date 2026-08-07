@@ -136,9 +136,10 @@
                     <select id="pace-mode" class="input-full"><option>Demand</option><option>FIX</option></select>
                     <div style="margin-top:10px;">
                         <label>Rate: <input type="number" id="pace-rate" value="70"></label><br>
-                        <label>Output: <input type="number" id="pace-ma" value="0"> mA</label>
+                        <label>Output (mA): <input type="number" id="pace-ma" value="0"></label>
                     </div>
-                    <button id="btn-start-pace" class="btn-blue full-width" style="margin-top: 10px; background: #0f9d58;" onclick="togglePacing()">Start Pacing</button>
+                    <!-- ปุ่มสำหรับให้ระบบประเมินการตั้งค่า Pacing (ไม่ต้องใช้เปิด/ปิดแล้ว เพราะ Capture ขึ้นออโต้) -->
+                    <button class="btn-blue full-width" style="margin-top: 10px; background: #0f9d58;" onclick="evaluateTreatment('Pace')">✅ ยืนยันการทำ Pacing</button>
                 </div>
             </div>
 
