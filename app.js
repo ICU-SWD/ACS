@@ -8,6 +8,7 @@ const leads12 = [
     ['III', 'aVF', 'V3', 'V6']
 ];
 
+// ฟังก์ชันจำลองคลื่น Gaussian ให้โค้งมนสมจริง
 function gaussian(x, a, b, c) {
     return a * Math.exp(-Math.pow(x - b, 2) / (2 * c * c));
 }
@@ -37,7 +38,7 @@ function getECGValue(phase, rhythm) {
     return -y; 
 }
 
-// ฟังก์ชันเปิด/ปิดการแสดง Rhythm (สำหรับทำข้อสอบ/ถามผู้เรียน)
+// เปิด-ปิด การแสดงผลเฉลย Rhythm
 function toggleRhythmDisplay() {
     const el = document.getElementById('rhythm-display');
     const btn = document.getElementById('btn-show-rhythm');
@@ -50,6 +51,7 @@ function toggleRhythmDisplay() {
     }
 }
 
+// อัปเดตข้อมูลสรุปอาการคนไข้
 function updateSummary() {
     let hr = document.getElementById('hr-input').value;
     let bp = document.getElementById('bp-input').value;
@@ -67,7 +69,6 @@ function updateSummary() {
         ? `<span style="color:#d93025; font-weight:bold;">UNSTABLE</span> (พบ: ${signs.join(', ')})` 
         : `<span style="color:#0f9d58; font-weight:bold;">STABLE</span>`;
         
-    // ตั้งค่าโครงสร้างสรุปอาการ (ซ่อน Rhythm ไว้เริ่มต้น)
     document.getElementById('summary-content').innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items: center;">
             <span><b>HR:</b> ${hr} bpm | <b>BP:</b> ${bp} mmHg</span>
@@ -86,6 +87,7 @@ function updateSummary() {
     document.getElementById('display-bp').innerText = bp;
 }
 
+// ระบบวาด EKG แบบ Continuous Sweep เต็มจอ
 function drawEKG() {
     const canvas = document.getElementById('ekg-canvas');
     const ctx = canvas.getContext('2d');
@@ -93,72 +95,94 @@ function drawEKG() {
     function resizeCanvas() {
         canvas.width = canvas.parentElement.clientWidth;
         canvas.height = canvas.parentElement.clientHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
     
     function render() {
-        ctx.fillStyle = state.mode === 'defib' ? 'rgba(17, 17, 17, 0.1)' : 'rgba(255, 255, 255, 0.1)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.clearRect(state.currentX + 2, 0, 10, canvas.height);
-        
         const hr = parseInt(document.getElementById('hr-input').value) || 80;
         const mainRhythm = document.getElementById('rhythm-select').value;
         const defectText = document.getElementById('lead-defect').value.toUpperCase();
         
-        // ปรับสเกลเวลา (Time Multiplier) ให้บีบอัดแกน X โชว์ Cycle ได้มากขึ้น
-        let timeInSeconds = (state.currentX * 0.018); // เพิ่มจาก 0.01 เป็น 0.018 
+        let timeInSeconds = (state.currentX * 0.022); 
         let phase = (timeInSeconds * (hr / 60)) % 1; 
+        
+        // Eraser Bar ลบเส้นล่วงหน้า
+        const eraseWidth = 20;
+        ctx.clearRect(state.currentX, 0, eraseWidth, canvas.height);
         
         ctx.lineWidth = 2;
 
         if(state.mode === 'defib') {
+            // โหมด Defib
             ctx.strokeStyle = '#00ff00';
             ctx.beginPath();
             let y = (canvas.height / 2) + getECGValue(phase, mainRhythm);
             ctx.moveTo(state.currentX, y);
-            ctx.lineTo(state.currentX + 1.5, y);
+            ctx.lineTo(state.currentX + 2, y);
             ctx.stroke();
             
             if(state.sync && phase > 0.29 && phase < 0.31) {
                 ctx.fillStyle = 'yellow';
                 ctx.fillRect(state.currentX, y - 30, 4, 15);
             }
+            
+            if (!(state.currentX + eraseWidth > 10 && state.currentX < 80)) {
+                ctx.fillStyle = '#0f0';
+                ctx.font = 'bold 16px Prompt';
+                ctx.fillText('Lead II', 10, 30);
+            }
+            
         } else {
-            ctx.strokeStyle = '#000000';
+            // โหมด 12-Lead
+            ctx.strokeStyle = '#333333';
             let cellW = canvas.width / 4;
-            let cellH = canvas.height / 3;
+            let cellH = canvas.height / 4; 
+            
+            let col = Math.floor(state.currentX / cellW);
+            if(col > 3) col = 3;
             
             for(let row = 0; row < 3; row++) {
-                for(let col = 0; col < 4; col++) {
-                    let leadName = leads12[row][col];
-                    let isDefect = defectText === 'ALL' || defectText.includes(leadName);
-                    let rhythmToUse = isDefect ? mainRhythm : 'nsr';
-                    
-                    let yOffset = (row * cellH) + (cellH / 2) + getECGValue(phase, rhythmToUse);
-                    let localX = (state.currentX % cellW) + (col * cellW);
-                    
-                    if(state.currentX % cellW === 0) {
-                        ctx.clearRect(col * cellW, row * cellH, cellW, cellH);
-                    }
+                let leadName = leads12[row][col];
+                let isDefect = defectText === 'ALL' || defectText.includes(leadName);
+                let rhythmToUse = isDefect ? mainRhythm : 'nsr';
+                
+                let yOffset = (row * cellH) + (cellH / 2) + getECGValue(phase, rhythmToUse);
+                
+                ctx.beginPath();
+                ctx.moveTo(state.currentX, yOffset);
+                ctx.lineTo(state.currentX + 2, yOffset);
+                ctx.stroke();
+            }
 
-                    ctx.beginPath();
-                    ctx.moveTo(localX, yOffset);
-                    ctx.lineTo(localX + 1.5, yOffset);
-                    ctx.stroke();
-                    
-                    if(localX === col * cellW) {
+            let isDefectII = defectText === 'ALL' || defectText.includes('II');
+            let yOffsetII = (3 * cellH) + (cellH / 2) + getECGValue(phase, isDefectII ? mainRhythm : 'nsr');
+            ctx.beginPath();
+            ctx.moveTo(state.currentX, yOffsetII);
+            ctx.lineTo(state.currentX + 2, yOffsetII);
+            ctx.stroke();
+
+            ctx.font = 'bold 14px Prompt';
+            for(let c = 0; c < 4; c++) {
+                let colX = c * cellW;
+                if (!(state.currentX + eraseWidth > colX + 5 && state.currentX < colX + 40)) {
+                    for(let r = 0; r < 3; r++) {
                         ctx.fillStyle = '#005bb5';
-                        ctx.font = '14px Prompt';
-                        ctx.fillText(leadName, localX + 5, (row * cellH) + 20);
+                        ctx.fillText(leads12[r][c], colX + 10, (r * cellH) + 25);
                     }
                 }
             }
+            if (!(state.currentX + eraseWidth > 5 && state.currentX < 140)) {
+                ctx.fillStyle = '#d93025';
+                ctx.fillText('II (Rhythm Strip)', 10, (3 * cellH) + 25);
+            }
         }
         
-        state.currentX += 1.5; // ลากเส้นช้าลงนิดนึงเพื่อให้เวลาบีบอัดแกน X แล้วคลื่นไม่วิ่งเร็วเกินไป
-        if(state.currentX >= canvas.width && state.mode === 'defib') state.currentX = 0;
-        if(state.currentX >= canvas.width / 4 && state.mode === '12lead') state.currentX = 0; 
+        state.currentX += 2; 
+        if(state.currentX >= canvas.width) {
+            state.currentX = 0;
+        }
         
         requestAnimationFrame(render);
     }
@@ -169,6 +193,8 @@ function toggleMachine() {
     state.mode = document.getElementById('machine-mode').value;
     const body = document.getElementById('app-body');
     const defibControls = document.getElementById('defib-controls');
+    const canvas = document.getElementById('ekg-canvas');
+    const ctx = canvas.getContext('2d');
     
     if(state.mode === 'defib') {
         body.className = 'theme-zoll';
@@ -178,8 +204,6 @@ function toggleMachine() {
         defibControls.style.display = 'none';
     }
     
-    const canvas = document.getElementById('ekg-canvas');
-    const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     state.currentX = 0; 
 }
