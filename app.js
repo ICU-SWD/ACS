@@ -1,7 +1,7 @@
 let state = {
     mode: '12lead', sync: false, defibMode: 'monitor', shockTimer: null, 
     currentX: 0, time: 0, lastY: null, lastY_12: Array(3).fill(null), lastY_II: null,
-    beatPhase: 0, beatIndex: 0, phaseMultiplier: 1
+    beatPhase: 0, beatIndex: 0, phaseMultiplier: 1, isPacing: false
 };
 
 const leads12 = [
@@ -14,7 +14,6 @@ function gaussian(x, a, b, c) {
     return a * Math.exp(-Math.pow(x - b, 2) / (2 * c * c));
 }
 
-// ==== คณิตศาสตร์การวาดคลื่นยังคงเดิม 100% ไม่เปลี่ยนแปลง ====
 function getECGValue(phase, rhythm, time, hr, beatIndex) {
     let y = 0;
     if (rhythm === 'asystole') return (Math.random() - 0.5) * 3;
@@ -102,7 +101,6 @@ function toggleRhythmDisplay() {
     }
 }
 
-// โหลดข้อมูลเข้า Summary 
 function updateSummary() {
     let hr = document.getElementById('hr-input').value;
     let bp = document.getElementById('bp-input').value;
@@ -141,7 +139,6 @@ function updateSummary() {
     document.getElementById('display-bp').innerText = bp;
 }
 
-// ระบบประเมินการรักษาอัจฉริยะ (Smart Interactive Feedback)
 function showPopup(isCorrect, message) {
     const modal = document.getElementById('feedback-modal');
     const box = document.getElementById('modal-box');
@@ -164,8 +161,8 @@ function closePopup() {
     document.getElementById('feedback-modal').style.display = 'none';
 }
 
+// ==== ระบบประเมินการรักษา (ACS/ACLS Algorithms) ====
 function evaluateTreatment(action) {
-    // ดึง State ปัจจุบันของคนไข้มาประเมิน
     let hr = parseInt(document.getElementById('hr-input').value) || 80;
     let rhythm = document.getElementById('rhythm-select').value;
     let isUnstable = document.getElementById('sign-loc').checked ||
@@ -180,25 +177,18 @@ function evaluateTreatment(action) {
     let isCorrect = false;
     let msg = "";
 
-    // 1. ตรวจสอบการทำ Pacing
     if (action === 'Pace') {
-        let ma = parseInt(document.getElementById('pace-ma').value) || 0;
-        if (ma < 50) {
-            showPopup(false, "พลังงานไม่เพียงพอ! โหมด Pace ต้องปรับพลังงาน (Output) อย่างน้อย 50 mA จึงจะเกิด Capture");
-            return;
-        }
         if (isAVBlock) {
-            isCorrect = true; msg = "เครื่องตรวจจับ Capture ได้แล้ว! Pacing คือการรักษาที่ถูกต้องสำหรับผู้ป่วย AV Block";
+            isCorrect = true; msg = "เริ่มระบบ Pacing! (คำแนะนำ: จะมีสัญลักษณ์ Capture ปรากฏขึ้นบน R wave ก็ต่อเมื่อตั้งพลังงานถึง 50 mA เท่านั้น)";
         } else {
-            isCorrect = false; msg = "เกิด Capture แล้ว แต่การทำ Pacing ไม่ใช่การรักษาหลักตาม Algorithm ของภาวะนี้";
+            isCorrect = false; msg = "เริ่มระบบ Pacing แต่นี่ไม่ใช่การรักษาหลักตาม Algorithm ของภาวะนี้";
         }
         showPopup(isCorrect, msg); return;
     }
 
-    // 2. Cardiac Arrest (VF, VT, Asystole, PEA)
     if (['vf', 'vt'].includes(rhythm)) {
         if (action === 'Defib-Async' || action === 'CPR') {
-            isCorrect = true; msg = "ถูกต้อง! การกดหน้าอก (CPR) และช็อกไฟฟ้า (Defibrillation) คือสิ่งสำคัญที่สุดใน VF/VT";
+            isCorrect = true; msg = "ถูกต้อง! การกดหน้าอก (CPR) และช็อกไฟฟ้า (Defib) คือสิ่งสำคัญที่สุดใน VF/VT";
         } else {
             isCorrect = false; msg = "ผิดพลาด! ผู้ป่วย VF/VT (Pulseless) ต้องรีบ CPR และทำการช็อกไฟฟ้า (Defib แบบ Asynchronized)";
         }
@@ -210,7 +200,6 @@ function evaluateTreatment(action) {
             isCorrect = false; msg = "ผิดพลาด! ภาวะ PEA/Asystole ตอบสนองกับ CPR และ ยา Adrenaline เท่านั้น";
         }
     }
-    // 3. Tachyarrhythmias (AF, A-Flutter, SVT)
     else if (['af', 'aflutter'].includes(rhythm)) {
         if (isUnstable && action === 'Defib-Sync') {
             isCorrect = true; msg = "ถูกต้อง! ผู้ป่วย AF/A-Flutter ที่ Unstable ต้องรีบทำ Synchronized Cardioversion";
@@ -229,10 +218,8 @@ function evaluateTreatment(action) {
             isCorrect = false; msg = isUnstable ? "ผู้ป่วย SVT ที่ Unstable ห้ามรอช้า ต้องทำ Synchronized Cardioversion!" : "ผู้ป่วย SVT ที่ยัง Stable ควรลองให้ยา Adenosine ก่อน";
         }
     }
-    // 4. Bradycardia & AV Blocks
     else if (isAVBlock) {
-        if (action === 'Pace') { /* จัดการด้านบนแล้ว */ }
-        else { isCorrect = false; msg = "ผู้ป่วยมีภาวะ AV Block การพิจารณาทำ Pacing คือทางเลือกที่ดีที่สุด"; }
+        isCorrect = false; msg = "ผู้ป่วยมีภาวะ AV Block การพิจารณาทำ Pacing คือทางเลือกที่ดีที่สุด";
     }
     else if (isBrady) {
         if (!isUnstable && action === 'Observe') {
@@ -243,7 +230,6 @@ function evaluateTreatment(action) {
             isCorrect = false; msg = isUnstable ? "ผู้ป่วยเต้นช้าและ Unstable ควรพิจารณาให้ Atropine, Dopamine หรือ Adrenaline" : "ผู้ป่วยยัง Stable ดี การสั่งการรักษาที่รุนแรงเกินไปอาจเป็นอันตราย แนะนำให้ สังเกตอาการ (Observe)";
         }
     }
-    // 5. Hypotension (Fallback สำหรับ NSR)
     else if (isHypo) {
         if (['Dopamine', 'Adrenaline', 'Levophed'].includes(action)) {
             isCorrect = true; msg = `ถูกต้อง! การพิจารณาให้ยา ${action} เหมาะสมสำหรับผู้ป่วยความดันโลหิตต่ำ (Hypotension)`;
@@ -251,7 +237,6 @@ function evaluateTreatment(action) {
             isCorrect = false; msg = "ผู้ป่วยมีความดันโลหิตต่ำ ควรพิจารณาให้ยากระตุ้นความดัน เช่น Dopamine, Adrenaline หรือ Levophed";
         }
     }
-    // 6. Normal/Other
     else {
         if (action === 'Observe') {
             isCorrect = true; msg = "ถูกต้อง! คลื่นไฟฟ้าหัวใจและอาการปกติดี ให้สังเกตอาการต่อไป";
@@ -259,11 +244,23 @@ function evaluateTreatment(action) {
             isCorrect = false; msg = "การสั่งการรักษานี้ยังไม่สอดคล้องกับ Algorithm สำหรับคลื่นไฟฟ้าและอาการปัจจุบัน";
         }
     }
-
     showPopup(isCorrect, msg);
 }
 
-// ==== ระบบการกดช็อกและวาดหน้าจอ ====
+// ==== ปุ่ม Control UI ====
+function togglePacing() {
+    let btn = document.getElementById('btn-start-pace');
+    if (!state.isPacing) {
+        state.isPacing = true;
+        btn.innerText = 'Stop Pacing';
+        btn.style.background = '#d93025';
+        evaluateTreatment('Pace');
+    } else {
+        state.isPacing = false;
+        btn.innerText = 'Start Pacing';
+        btn.style.background = '#0f9d58';
+    }
+}
 
 function startShock() {
     const energy = document.getElementById('energy-select').value;
@@ -271,11 +268,9 @@ function startShock() {
         document.getElementById('shock-progress').style.display = 'block';
         state.shockTimer = setTimeout(() => {
             document.getElementById('shock-progress').style.display = 'none';
-            // ส่งไปประเมินผลการรักษา
             evaluateTreatment('Defib-Sync');
-        }, 1500); // กดแช่
+        }, 1500);
     } else {
-        // ส่งไปประเมินผลการรักษาทันที
         evaluateTreatment('Defib-Async');
     }
 }
@@ -287,7 +282,6 @@ function cancelShock() {
 }
 
 function exportEKG() {
-    // โค้ดส่งออก PNG เหมือนเดิม
     const canvas = document.getElementById('ekg-canvas');
     const exportCanvas = document.createElement('canvas');
     exportCanvas.width = canvas.width; exportCanvas.height = canvas.height;
@@ -309,6 +303,7 @@ function exportEKG() {
     } else {
         eCtx.fillStyle = '#111111'; eCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
     }
+
     eCtx.drawImage(canvas, 0, 0);
     const rhythmName = document.getElementById('rhythm-select').options[document.getElementById('rhythm-select').selectedIndex].text;
     const hr = document.getElementById('hr-input').value;
@@ -337,6 +332,7 @@ document.addEventListener("fullscreenchange", () => {
     if (!document.fullscreenElement) document.getElementById("fullscreen-btn").innerText = "⛶ เต็มจอ";
 });
 
+// ==== Rendering Engine ====
 function drawEKG() {
     const canvas = document.getElementById('ekg-canvas');
     const ctx = canvas.getContext('2d');
@@ -354,6 +350,10 @@ function drawEKG() {
         const mainRhythm = document.getElementById('rhythm-select').value;
         const defectLeadsList = getDefectiveLeads();
         
+        // Pacing Logic
+        let pacingMa = parseInt(document.getElementById('pace-ma').value) || 0;
+        let showPaceCapture = (state.defibMode === 'pace' && state.isPacing && pacingMa >= 50);
+
         let speed = 2; 
         ctx.lineWidth = 2;
 
@@ -388,8 +388,14 @@ function drawEKG() {
                 }
                 state.lastY = y;
                 
-                if(state.sync && phase > 0.29 && phase < 0.31) {
+                // Draw Sync
+                if(state.sync && state.defibMode !== 'pace' && phase > 0.29 && phase < 0.31) {
                     ctx.fillStyle = 'yellow'; ctx.fillRect(state.currentX, y - 30, 2, 15);
+                }
+                // Draw Pace Capture (ขีดสีฟ้าบน R Wave)
+                if(showPaceCapture && phase > 0.295 && phase < 0.304) {
+                    ctx.fillStyle = '#00ffff'; 
+                    ctx.fillRect(state.currentX, y - 50, 2, 50);
                 }
             } else {
                 ctx.strokeStyle = '#333333';
@@ -417,6 +423,12 @@ function drawEKG() {
                     ctx.beginPath(); ctx.moveTo(state.currentX - 1, state.lastY_II); ctx.lineTo(state.currentX, yOffsetII); ctx.stroke();
                 }
                 state.lastY_II = yOffsetII;
+                
+                // Draw Pace Capture on 12-Lead Rhythm Strip (Lead II ล่างสุด)
+                if(showPaceCapture && phase > 0.295 && phase < 0.304) {
+                    ctx.fillStyle = '#00ffff'; 
+                    ctx.fillRect(state.currentX, yOffsetII - 30, 2, 30);
+                }
             }
         }
         
@@ -449,6 +461,11 @@ function toggleMachine() {
         body.className = 'theme-nihon'; defibControls.style.display = 'none';
     }
     
+    // Stop pacing on mode switch to prevent bugs
+    state.isPacing = false;
+    let paceBtn = document.getElementById('btn-start-pace');
+    if(paceBtn) { paceBtn.innerText = 'Start Pacing'; paceBtn.style.background = '#0f9d58'; }
+    
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     state.currentX = 0; state.lastY = null; state.lastY_12.fill(null); state.lastY_II = null;
     state.beatPhase = 0; 
@@ -456,9 +473,17 @@ function toggleMachine() {
 
 function setDefibMode(mode) {
     state.defibMode = mode;
+    
+    if (mode !== 'pace') {
+        state.isPacing = false;
+        let paceBtn = document.getElementById('btn-start-pace');
+        if(paceBtn) { paceBtn.innerText = 'Start Pacing'; paceBtn.style.background = '#0f9d58'; }
+    }
+    
     document.getElementById('defib-sub-panel').style.display = mode === 'defib' ? 'block' : 'none';
     document.getElementById('pace-sub-panel').style.display = mode === 'pace' ? 'block' : 'none';
 }
+
 function toggleSync() {
     state.sync = !state.sync;
     document.getElementById('sync-status').style.display = state.sync ? 'inline-block' : 'none';
