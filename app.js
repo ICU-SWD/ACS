@@ -2,7 +2,7 @@ let state = {
     mode: '12lead', sync: false, defibMode: 'monitor', shockTimer: null, 
     currentX: 0, time: 0, lastY: null, lastY_12: Array(3).fill(null), lastY_II: null,
     beatPhase: 0, beatIndex: 0, phaseMultiplier: 1,
-    lastPaceSpikeBeat: -1, // ป้องกันการวาด Capture ซ้ำซ้อน
+    lastPaceSpikeBeat: -1, 
     lastSyncSpikeBeat: -1
 };
 
@@ -74,7 +74,6 @@ function getECGValue(phase, rhythm, time, hr, beatIndex) {
     return -y; 
 }
 
-// ==== UI Logic ====
 function updateLeadDefectUI() {
     const mode = document.getElementById('lead-defect-mode').value;
     document.getElementById('custom-lead-selector').style.display = mode === 'CUSTOM' ? 'grid' : 'none';
@@ -163,7 +162,6 @@ function closePopup() {
     document.getElementById('feedback-modal').style.display = 'none';
 }
 
-// ==== ระบบประเมินการรักษา (ACS/ACLS Algorithms) ====
 function evaluateTreatment(action) {
     let hr = parseInt(document.getElementById('hr-input').value) || 80;
     let rhythm = document.getElementById('rhythm-select').value;
@@ -252,7 +250,6 @@ function evaluateTreatment(action) {
     showPopup(isCorrect, msg);
 }
 
-// ==== ปุ่ม Control UI ====
 function startShock() {
     const energy = document.getElementById('energy-select').value;
     if(state.sync) {
@@ -265,6 +262,7 @@ function startShock() {
         evaluateTreatment('Defib-Async');
     }
 }
+
 function cancelShock() {
     if(state.shockTimer && state.sync) {
         clearTimeout(state.shockTimer);
@@ -323,7 +321,6 @@ document.addEventListener("fullscreenchange", () => {
     if (!document.fullscreenElement) document.getElementById("fullscreen-btn").innerText = "⛶ เต็มจอ";
 });
 
-// ==== Rendering Engine ====
 function drawEKG() {
     const canvas = document.getElementById('ekg-canvas');
     const ctx = canvas.getContext('2d');
@@ -341,7 +338,6 @@ function drawEKG() {
         const mainRhythm = document.getElementById('rhythm-select').value;
         const defectLeadsList = getDefectiveLeads();
         
-        // อ่านค่าพลังงาน Real-time
         let pacingMa = parseInt(document.getElementById('pace-ma').value) || 0;
         let showPaceCapture = (state.defibMode === 'pace' && pacingMa >= 50);
 
@@ -374,28 +370,21 @@ function drawEKG() {
                 ctx.strokeStyle = '#00ff00';
                 let y = (canvas.height / 2) + getECGValue(phase, mainRhythm, state.time, hr, state.beatIndex);
                 
-                // วาดกราฟหัวใจสีเขียว
                 if (state.currentX > 0 && state.lastY !== null) {
                     ctx.beginPath(); ctx.moveTo(state.currentX - 1, state.lastY); ctx.lineTo(state.currentX, y); ctx.stroke();
                 }
                 state.lastY = y;
                 
-                // ---- DRAW CAPTURE & SYNC (วาดล้าหลังเส้นยางลบ 2px เพื่อป้องกันการถูกลบทับ) ----
-                
-                // 1. Sync Marker (เส้นสีเหลืองเล็กๆ)
                 if(state.sync && state.defibMode !== 'pace' && phase >= 0.295 && state.lastSyncSpikeBeat !== state.beatIndex) {
                     state.lastSyncSpikeBeat = state.beatIndex;
                     ctx.fillStyle = 'yellow'; 
                     ctx.fillRect(state.currentX - 2, (canvas.height / 2) - 40, 4, 20);
                 }
-                
-                // 2. Pace Capture Marker (เส้นสีฟ้าสว่าง ใหญ่และยาว)
                 if(showPaceCapture && phase >= 0.295 && state.lastPaceSpikeBeat !== state.beatIndex) {
                     state.lastPaceSpikeBeat = state.beatIndex;
                     ctx.fillStyle = '#00ffff'; 
                     ctx.fillRect(state.currentX - 2, (canvas.height / 2) - 80, 4, 150);
                 }
-
             } else {
                 ctx.strokeStyle = '#333333';
                 let cellW = canvas.width / 4; let cellH = canvas.height / 4; 
@@ -423,15 +412,12 @@ function drawEKG() {
                 }
                 state.lastY_II = yOffsetII;
                 
-                // Pace Capture Marker สำหรับโหมด 12 Lead (วาดบน Rhythm Strip)
                 if(showPaceCapture && phase >= 0.295 && state.lastPaceSpikeBeat !== state.beatIndex) {
                     state.lastPaceSpikeBeat = state.beatIndex;
                     ctx.fillStyle = '#00ffff'; 
-                    // แถวบนๆ
                     for(let r = 0; r < 3; r++) {
                         ctx.fillRect(state.currentX - 2, (r * cellH) + (cellH / 2) - 40, 3, 80);
                     }
-                    // Rhythm strip ล่างสุด
                     ctx.fillRect(state.currentX - 2, (3 * cellH) + (cellH / 2) - 40, 3, 80);
                 }
             }
