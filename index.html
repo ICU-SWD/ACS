@@ -23,10 +23,18 @@
             <label>Rhythm: 
                 <select id="rhythm-select" onchange="updateSummary()">
                     <option value="nsr">Normal Sinus</option>
+                    <option value="af">Atrial Fibrillation (AF)</option>
+                    <option value="aflutter">Atrial Flutter</option>
+                    <option value="svt">SVT</option>
+                    <option value="1st-avb">1st Degree AV Block</option>
+                    <option value="2nd-avb-1">2nd Degree AV Block (Type I)</option>
+                    <option value="2nd-avb-2">2nd Degree AV Block (Type II)</option>
+                    <option value="3rd-avb">3rd Degree AV Block</option>
                     <option value="st-elev">ST Elevation</option>
                     <option value="st-dep">ST Depression</option>
                     <option value="t-inv">T Invert</option>
                     <option value="peak-t">Tall Peak T</option>
+                    <option value="tdp">Torsades de Pointes</option>
                     <option value="vf">VF</option>
                     <option value="vt">VT (Pulseless)</option>
                     <option value="asystole">Asystole</option>
@@ -34,7 +42,6 @@
                 </select>
             </label>
             
-            <!-- อัปเดต: ระบบเลือก Lead แบบใหม่ -->
             <label>Lead ผิดปกติ: 
                 <select id="lead-defect-mode" onchange="updateLeadDefectUI(); updateSummary();">
                     <option value="ALL">ทั้งหมด (All Leads)</option>
@@ -71,9 +78,8 @@
             </div>
         </div>
 
-        <!-- หน้าจอ Monitor และสรุปอาการ -->
+        <!-- หน้าจอ Monitor -->
         <div id="center-display">
-            <!-- ส่วนสรุปอาการคนไข้ และปุ่ม Export -->
             <div id="patient-summary" class="panel">
                 <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid #e1e8ed; padding-bottom: 5px; margin-bottom: 5px;">
                     <h4 style="margin: 0; color: #005bb5;">📋 สรุปอาการผู้ป่วย (Patient Summary)</h4>
@@ -82,7 +88,6 @@
                 <div id="summary-content">กำลังโหลดข้อมูล...</div>
             </div>
 
-            <!-- หน้าจอ EKG -->
             <div id="monitor-display">
                 <div id="zoll-header" style="display:none;">ZOLL R Series</div>
                 <canvas id="ekg-canvas"></canvas>
