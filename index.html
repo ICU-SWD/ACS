@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>EKG & ACS Simulator (Pro)</title>
+    <title>Electrocardiogram and ACS simulator</title>
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -20,6 +20,15 @@
     <div class="app-container">
         <!-- แผงควบคุมสำหรับ Instructor -->
         <div id="instructor-panel" class="panel blue-accent">
+            
+            <!-- ====== ส่วน Credit และ Logo ====== -->
+            <div class="credit-section">
+                <img src="https://lh3.googleusercontent.com/d/1DlsLtw43ZhgFrmvjS6ySFH4EmSwuS0tk" alt="Hospital Logo" class="hospital-logo">
+                <h3 class="app-title">Electrocardiogram and ACS simulator</h3>
+                <p class="app-author">designed & developed by Patiyut</p>
+            </div>
+            <!-- ================================== -->
+
             <h3 class="panel-title">Instructor Control</h3>
             <label>โหมดเครื่อง: 
                 <select id="machine-mode" onchange="toggleMachine()">
@@ -28,7 +37,7 @@
                 </select>
             </label>
             <hr>
-            <label>HR: <input type="number" id="hr-input" value="40" max="300" oninput="updateSummary()"></label>
+            <label>HR: <input type="number" id="hr-input" value="80" max="300" oninput="updateSummary()"></label>
             <label>BP: <input type="text" id="bp-input" value="120/80" oninput="updateSummary()"></label>
             <label>Rhythm: 
                 <select id="rhythm-select" onchange="updateSummary()">
@@ -103,7 +112,7 @@
                 <div id="zoll-header" style="display:none;">ZOLL R Series</div>
                 <canvas id="ekg-canvas"></canvas>
                 <div id="vitals-display">
-                    <div class="vital-box">HR <span id="display-hr">40</span></div>
+                    <div class="vital-box">HR <span id="display-hr">80</span></div>
                     <div class="vital-box">BP <span id="display-bp">120/80</span></div>
                     <div id="sync-status" style="display:none; color: yellow;">SYNC</div>
                 </div>
