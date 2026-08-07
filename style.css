@@ -1,4 +1,4 @@
-/* เปลี่ยนมาใช้ฟอนต์ Prompt */
+/* กฏ 60-30-10: 60% ขาว/สว่าง (Background), 30% ฟ้า (Accent/Button), 10% แดง (Critical) */
 body { 
     font-family: 'Prompt', sans-serif; 
     background-color: #f0f4f8; 
@@ -85,6 +85,7 @@ input[type="number"], input[type="text"], select {
     border: 1px solid #ccc; border-radius: 4px;
 }
 
+/* 10% Red - ปุ่มช็อก */
 .shock-btn { 
     background: #d93025; 
     color: white; 
@@ -99,17 +100,17 @@ input[type="number"], input[type="text"], select {
 /* 12-Lead Grid */
 .theme-nihon #monitor-display { border-color: #005bb5; background: #fff; }
 .theme-nihon #ekg-canvas {
-    background-color: #fff;
+    background-color: transparent; /* ให้โปร่งใสเพื่อให้เห็นลายตารางด้านล่าง */
     background-image: 
-        linear-gradient(rgba(255, 192, 203, 0.5) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 192, 203, 0.5) 1px, transparent 1px),
-        linear-gradient(rgba(255, 0, 0, 0.3) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 0, 0, 0.3) 1px, transparent 1px);
+        linear-gradient(rgba(255, 192, 203, 0.6) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 192, 203, 0.6) 1px, transparent 1px),
+        linear-gradient(rgba(255, 0, 0, 0.4) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 0, 0, 0.4) 1px, transparent 1px);
     background-size: 10px 10px, 10px 10px, 50px 50px, 50px 50px;
 }
 .theme-nihon .vital-box { color: #333; }
 
-/* Zoll Theme */
+/* Zoll Theme (Defib) */
 .theme-zoll #monitor-display { border-color: #005bb5; background-color: #111; }
 .theme-zoll #zoll-header { 
     display: block !important; background: #ffcc00; color: #000; 
