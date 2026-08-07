@@ -2,97 +2,108 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>EKG & ACS Simulator</title>
+    <title>EKG & ACS Simulator (Pro)</title>
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="theme-nihon" id="app-body">
-    <!-- แผงควบคุมสำหรับ Instructor / ตั้งค่า -->
-    <div id="instructor-panel">
-        <h3>Instructor Control</h3>
-        <label>Mode: 
-            <select id="machine-mode" onchange="toggleMachine()">
-                <option value="12lead">Nihon 12-Lead EKG</option>
-                <option value="defib">Zoll R Series Defibrillator</option>
-            </select>
-        </label>
-        <hr>
-        <label>HR: <input type="number" id="hr-input" value="80" max="300"></label>
-        <label>BP: <input type="text" id="bp-input" value="120/80"></label>
-        <label>Rhythm: 
-            <select id="rhythm-select">
-                <option value="nsr">Normal Sinus</option>
-                <option value="st-elev">ST Elevation</option>
-                <option value="st-dep">ST Depression</option>
-                <option value="t-inv">T Invert</option>
-                <option value="peak-t">Tall Peak T</option>
-                <option value="vf">VF</option>
-                <option value="vt">VT (Pulseless)</option>
-                <option value="asystole">Asystole</option>
-                <option value="pea">PEA</option>
-            </select>
-        </label>
-        <label>Lead ผิดปกติ: <input type="text" id="lead-defect" placeholder="เช่น II, III, aVF" value="All"></label>
-        
-        <h4>Unstable Signs (ประเมินหน้างาน)</h4>
-        <div class="checkbox-group">
-            <label><input type="checkbox"> Alteration of conscious</label><br>
-            <label><input type="checkbox"> Sign of Heart Failure</label><br>
-            <label><input type="checkbox"> Chest Pain</label><br>
-            <label><input type="checkbox"> Hypotension</label><br>
-            <label><input type="checkbox"> Signs of Shock</label>
-        </div>
-    </div>
-
-    <!-- หน้าจอแสดงผลเครื่องมือ (Monitor) -->
-    <div id="monitor-display">
-        <div id="zoll-header" style="display:none;">ZOLL R Series</div>
-        <canvas id="ekg-canvas"></canvas>
-        <div id="vitals-display">
-            <div class="vital-box">HR <span id="display-hr">80</span></div>
-            <div class="vital-box">BP <span id="display-bp">120/80</span></div>
-            <div id="sync-status" style="display:none; color: yellow;">SYNC</div>
-        </div>
-    </div>
-
-    <!-- แผงควบคุมการทำงานของผู้เรียน (Student Panel) -->
-    <div id="student-panel">
-        <div id="defib-controls" style="display: none;">
-            <h3>Zoll Controls</h3>
-            <div class="mode-buttons">
-                <button onclick="setDefibMode('monitor')">Monitor</button>
-                <button onclick="setDefibMode('defib')">Defib</button>
-                <button onclick="setDefibMode('pace')">Pace</button>
-            </div>
-            
-            <div id="defib-sub-panel" class="control-box" style="display:none;">
-                <button onclick="toggleSync()" id="btn-sync">Sync / Async</button>
-                <br><br>
-                <label>Energy: <input type="number" id="energy-select" min="50" max="300" step="10" value="200"> J</label>
-                <br><br>
-                <button id="btn-shock" onmousedown="startShock()" onmouseup="cancelShock()" class="shock-btn">SHOCK</button>
-                <div id="shock-progress" style="display:none; color:red; font-size:12px;">Charging... Hold button!</div>
-            </div>
-
-            <div id="pace-sub-panel" class="control-box" style="display:none;">
-                <select id="pace-mode">
-                    <option>Demand</option>
-                    <option>FIX</option>
+<body id="app-body">
+    <div class="app-container">
+        <!-- แผงควบคุมสำหรับ Instructor -->
+        <div id="instructor-panel" class="panel blue-accent">
+            <h3 class="panel-title">Instructor Control</h3>
+            <label>โหมดเครื่อง: 
+                <select id="machine-mode" onchange="toggleMachine()">
+                    <option value="12lead">Nihon 12-Lead EKG</option>
+                    <option value="defib">Zoll R Series Defib</option>
                 </select>
-                <br><br>
-                <label>Rate: <input type="number" id="pace-rate" value="70"></label> <br>
-                <label>Output: <input type="number" id="pace-ma" value="0"> mA</label>
+            </label>
+            <hr>
+            <label>HR: <input type="number" id="hr-input" value="80" max="300" oninput="updateSummary()"></label>
+            <label>BP: <input type="text" id="bp-input" value="120/80" oninput="updateSummary()"></label>
+            <label>Rhythm: 
+                <select id="rhythm-select" onchange="updateSummary()">
+                    <option value="nsr">Normal Sinus</option>
+                    <option value="st-elev">ST Elevation</option>
+                    <option value="st-dep">ST Depression</option>
+                    <option value="t-inv">T Invert</option>
+                    <option value="peak-t">Tall Peak T</option>
+                    <option value="vf">VF</option>
+                    <option value="vt">VT (Pulseless)</option>
+                    <option value="asystole">Asystole</option>
+                    <option value="pea">PEA</option>
+                </select>
+            </label>
+            <label>Lead ผิดปกติ: <input type="text" id="lead-defect" placeholder="เช่น II, III, aVF" value="All" oninput="updateSummary()"></label>
+            
+            <h4 style="margin-top: 15px;">Unstable Signs</h4>
+            <div class="checkbox-group">
+                <label><input type="checkbox" id="sign-loc" onchange="updateSummary()"> Alteration of conscious</label><br>
+                <label><input type="checkbox" id="sign-hf" onchange="updateSummary()"> Sign of Heart Failure</label><br>
+                <label><input type="checkbox" id="sign-cp" onchange="updateSummary()"> Chest Pain</label><br>
+                <label><input type="checkbox" id="sign-hypo" onchange="updateSummary()"> Hypotension</label><br>
+                <label><input type="checkbox" id="sign-shock" onchange="updateSummary()"> Signs of Shock</label>
             </div>
         </div>
 
-        <div id="interventions">
-            <h3>Action & Meds (ACS 2025)</h3>
-            <button onclick="triggerAction('CPR 2 mins')">CPR 2 mins</button>
-            <button onclick="triggerAction('Adrenaline 1mg')">Adrenaline 1mg</button>
-            <button onclick="triggerAction('Amiodarone 300mg')">Amiodarone 300mg</button>
-            <button onclick="triggerAction('Adenosine 6mg')">Adenosine 6mg</button>
-            <button onclick="triggerAction('Dopamine')">Dopamine</button>
-            <button onclick="triggerAction('Levophed')">Levophed</button>
-            <button onclick="triggerAction('Xylocaine')">Xylocaine</button>
+        <!-- หน้าจอ Monitor และสรุปอาการ -->
+        <div id="center-display">
+            <!-- ส่วนสรุปอาการคนไข้ -->
+            <div id="patient-summary" class="panel">
+                <h4 style="margin: 0 0 5px 0; color: #005bb5;">📋 สรุปอาการผู้ป่วย (Patient Summary)</h4>
+                <div id="summary-content">กำลังโหลดข้อมูล...</div>
+            </div>
+
+            <!-- หน้าจอ EKG -->
+            <div id="monitor-display">
+                <div id="zoll-header" style="display:none;">ZOLL R Series</div>
+                <canvas id="ekg-canvas"></canvas>
+                <div id="vitals-display">
+                    <div class="vital-box">HR <span id="display-hr">80</span></div>
+                    <div class="vital-box">BP <span id="display-bp">120/80</span></div>
+                    <div id="sync-status" style="display:none; color: yellow;">SYNC</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- แผงควบคุมผู้เรียน -->
+        <div id="student-panel" class="panel blue-accent">
+            <div id="defib-controls" style="display: none;">
+                <h3 class="panel-title">Zoll Controls</h3>
+                <div class="mode-buttons">
+                    <button class="btn-blue" onclick="setDefibMode('monitor')">Monitor</button>
+                    <button class="btn-blue" onclick="setDefibMode('defib')">Defib</button>
+                    <button class="btn-blue" onclick="setDefibMode('pace')">Pace</button>
+                </div>
+                
+                <div id="defib-sub-panel" class="control-box" style="display:none;">
+                    <button class="btn-blue" onclick="toggleSync()" id="btn-sync" style="width:100%">Sync / Async</button>
+                    <div style="margin: 15px 0;">
+                        <label>Energy (J): <input type="number" id="energy-select" min="50" max="300" step="10" value="200"></label>
+                    </div>
+                    <div style="text-align: center;">
+                        <button id="btn-shock" onmousedown="startShock()" onmouseup="cancelShock()" class="shock-btn">SHOCK</button>
+                    </div>
+                    <div id="shock-progress" style="display:none; color:#d93025; font-weight:bold; text-align:center; margin-top:10px;">Charging... Hold button!</div>
+                </div>
+
+                <div id="pace-sub-panel" class="control-box" style="display:none;">
+                    <select id="pace-mode" class="input-full"><option>Demand</option><option>FIX</option></select>
+                    <div style="margin-top:10px;">
+                        <label>Rate: <input type="number" id="pace-rate" value="70"></label><br>
+                        <label>Output: <input type="number" id="pace-ma" value="0"> mA</label>
+                    </div>
+                </div>
+            </div>
+
+            <div id="interventions" style="margin-top: 20px;">
+                <h3 class="panel-title">Action & Meds</h3>
+                <button class="btn-blue full-width" onclick="triggerAction('CPR 2 mins')">CPR 2 mins</button>
+                <button class="btn-blue full-width" onclick="triggerAction('Adrenaline 1mg')">Adrenaline 1mg</button>
+                <button class="btn-blue full-width" onclick="triggerAction('Amiodarone 300mg')">Amiodarone 300mg</button>
+                <button class="btn-blue full-width" onclick="triggerAction('Adenosine 6mg')">Adenosine 6mg</button>
+                <button class="btn-blue full-width" onclick="triggerAction('Dopamine')">Dopamine</button>
+                <button class="btn-blue full-width" onclick="triggerAction('Levophed')">Levophed</button>
+                <button class="btn-blue full-width" onclick="triggerAction('Xylocaine')">Xylocaine</button>
+            </div>
         </div>
     </div>
     
