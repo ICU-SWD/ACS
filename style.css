@@ -1,7 +1,7 @@
-/* กฏ 60-30-10: 60% ขาว/สว่าง (Background), 30% ฟ้า (Accent/Button), 10% แดง (Critical) */
+/* เปลี่ยนมาใช้ฟอนต์ Prompt */
 body { 
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-    background-color: #f0f4f8; /* 60% White/Light Gray */
+    font-family: 'Prompt', sans-serif; 
+    background-color: #f0f4f8; 
     color: #333; 
     margin: 0; 
     padding: 10px; 
@@ -24,7 +24,7 @@ body {
     overflow-y: auto;
 }
 .blue-accent {
-    border-top: 5px solid #005bb5; /* 30% Blue */
+    border-top: 5px solid #005bb5; 
 }
 .panel-title {
     color: #005bb5;
@@ -41,7 +41,7 @@ body {
 #patient-summary {
     background: #ffffff;
     border-left: 5px solid #005bb5;
-    font-size: 14px;
+    font-size: 15px;
     line-height: 1.6;
 }
 #monitor-display { 
@@ -65,6 +65,7 @@ body {
 }
 /* Buttons */
 button {
+    font-family: 'Prompt', sans-serif;
     padding: 10px;
     margin: 3px;
     cursor: pointer;
@@ -73,19 +74,17 @@ button {
     font-weight: 600;
     transition: 0.2s;
 }
-.btn-blue {
-    background: #005bb5; /* 30% Blue */
-    color: white;
-}
+.btn-blue { background: #005bb5; color: white; }
 .btn-blue:hover { background: #004488; }
+.btn-small { padding: 4px 10px; font-size: 13px; }
 .full-width { width: 100%; display: block; margin-bottom: 8px; }
 
 input[type="number"], input[type="text"], select {
+    font-family: 'Prompt', sans-serif;
     padding: 6px; width: calc(100% - 15px); margin-top: 5px; margin-bottom: 10px;
     border: 1px solid #ccc; border-radius: 4px;
 }
 
-/* 10% Red - ปุ่มและจุดวิกฤต */
 .shock-btn { 
     background: #d93025; 
     color: white; 
@@ -97,7 +96,7 @@ input[type="number"], input[type="text"], select {
 }
 .shock-btn:active { transform: scale(0.95); background: #b3261d; }
 
-/* 12-Lead Grid Background (สีชมพูอ่อนแบบกระดาษ EKG จริง) */
+/* 12-Lead Grid */
 .theme-nihon #monitor-display { border-color: #005bb5; background: #fff; }
 .theme-nihon #ekg-canvas {
     background-color: #fff;
@@ -110,11 +109,11 @@ input[type="number"], input[type="text"], select {
 }
 .theme-nihon .vital-box { color: #333; }
 
-/* Zoll Theme (Defib) - ยังคงความมืดเพื่อความสมจริงของจอ Zoll แต่ตีกรอบฟ้า */
+/* Zoll Theme */
 .theme-zoll #monitor-display { border-color: #005bb5; background-color: #111; }
 .theme-zoll #zoll-header { 
     display: block !important; background: #ffcc00; color: #000; 
     font-weight: bold; padding: 5px; text-align: center; 
 }
 .theme-zoll #ekg-canvas { background: #111; }
-.theme-zoll .vital-box { color: #0f0; font-family: 'Courier New', Courier, monospace; }
+.theme-zoll .vital-box { color: #0f0; }
