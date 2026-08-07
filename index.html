@@ -28,7 +28,7 @@
                 </select>
             </label>
             <hr>
-            <label>HR: <input type="number" id="hr-input" value="80" max="300" oninput="updateSummary()"></label>
+            <label>HR: <input type="number" id="hr-input" value="40" max="300" oninput="updateSummary()"></label>
             <label>BP: <input type="text" id="bp-input" value="120/80" oninput="updateSummary()"></label>
             <label>Rhythm: 
                 <select id="rhythm-select" onchange="updateSummary()">
@@ -103,7 +103,7 @@
                 <div id="zoll-header" style="display:none;">ZOLL R Series</div>
                 <canvas id="ekg-canvas"></canvas>
                 <div id="vitals-display">
-                    <div class="vital-box">HR <span id="display-hr">80</span></div>
+                    <div class="vital-box">HR <span id="display-hr">40</span></div>
                     <div class="vital-box">BP <span id="display-bp">120/80</span></div>
                     <div id="sync-status" style="display:none; color: yellow;">SYNC</div>
                 </div>
@@ -138,7 +138,6 @@
                         <label>Rate: <input type="number" id="pace-rate" value="70"></label><br>
                         <label>Output (mA): <input type="number" id="pace-ma" value="0"></label>
                     </div>
-                    <!-- ปุ่มสำหรับให้ระบบประเมินการตั้งค่า Pacing (ไม่ต้องใช้เปิด/ปิดแล้ว เพราะ Capture ขึ้นออโต้) -->
                     <button class="btn-blue full-width" style="margin-top: 10px; background: #0f9d58;" onclick="evaluateTreatment('Pace')">✅ ยืนยันการทำ Pacing</button>
                 </div>
             </div>
