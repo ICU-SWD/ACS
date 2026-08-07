@@ -1,6 +1,7 @@
 let state = {
     mode: '12lead', sync: false, defibMode: 'monitor', shockTimer: null, 
-    currentX: 0, time: 0, lastY: null, lastY_12: Array(3).fill(null), lastY_II: null
+    currentX: 0, time: 0, lastY: null, lastY_12: Array(3).fill(null), lastY_II: null,
+    beatPhase: 0, beatIndex: 0, phaseMultiplier: 1 // ตัวแปรสำหรับคุมความผิดปกติ AF/AV Block
 };
 
 const leads12 = [
@@ -13,10 +14,11 @@ function gaussian(x, a, b, c) {
     return a * Math.exp(-Math.pow(x - b, 2) / (2 * c * c));
 }
 
-function getECGValue(phase, rhythm, time, hr) {
+// อัปเดตสมการคลื่น EKG รองรับ AF Irregular, SVT Merged P+T, Tall Peak T
+function getECGValue(phase, rhythm, time, hr, beatIndex) {
     let y = 0;
     
-    // --- 1. Life-Threatening Arrest Rhythms ---
+    // --- 1. ภาวะหัวใจหยุดเต้น ---
     if (rhythm === 'asystole') return (Math.random() - 0.5) * 3;
     if (rhythm === 'vf') return Math.sin(phase * Math.PI * 10) * 15 + Math.sin(phase * Math.PI * 22) * 10 + (Math.random()-0.5)*10;
     if (rhythm === 'vt') return Math.sin(phase * Math.PI * 6) * 40; 
@@ -25,49 +27,49 @@ function getECGValue(phase, rhythm, time, hr) {
         return -(Math.sin(time * 25) * envelope + (Math.random()-0.5)*5);
     }
 
-    // --- 2. Wave Coordinates ---
+    // --- 2. พิกัดปกติของ P-QRS-T ---
     let pCenter = 0.15, qCenter = 0.28, rCenter = 0.30, sCenter = 0.32, tCenter = 0.55;
     let showP = true, showQRS = true, showT = true;
-    let beatIndex = Math.floor(time * (hr / 60)); 
     
-    // --- 3. Rhythm Logic ---
+    // --- 3. ตรรกะความผิดปกติของจังหวะ (Arrhythmias) ---
     if (rhythm === 'af') {
-        showP = false;
-        y += Math.sin(time * 25) * 2 + Math.sin(time * 15) * 3 + (Math.random()-0.5)*2; // Fibrillatory baseline
+        showP = false; // ไม่มี P Wave
+        y += Math.sin(time * 25) * 2 + Math.sin(time * 15) * 3 + (Math.random()-0.5)*2; // เส้นฐานแกว่ง
     } else if (rhythm === 'aflutter') {
         showP = false;
-        y += Math.sin(time * 18) * 6 + Math.cos(time * 36) * 3; // Sawtooth baseline
+        y += Math.sin(time * 18) * 6 + Math.cos(time * 36) * 3; // เส้นฐานฟันเลื่อย
     } else if (rhythm === 'svt') {
-        showP = false; // P wave hidden in fast rate
+        showP = false; 
+        tCenter = 0.80; // ย้าย P+T wave มาตรงกลางเป๊ะๆ ระหว่าง QRS สองตัว
     } else if (rhythm === '1st-avb') {
-        pCenter = 0.05; // PR Prolonged
-    } else if (rhythm === '2nd-avb-1') { // Wenckebach (4-beat cycle)
+        pCenter = 0.05; // PR ยาว
+    } else if (rhythm === '2nd-avb-1') { // Wenckebach
         let cycle = beatIndex % 4;
         if (cycle === 0) pCenter = 0.15;
         if (cycle === 1) pCenter = 0.10;
         if (cycle === 2) pCenter = 0.05;
         if (cycle === 3) { showQRS = false; showT = false; }
-    } else if (rhythm === '2nd-avb-2') { // Mobitz II (Drop every 3rd beat)
+    } else if (rhythm === '2nd-avb-2') { // Mobitz II
         if (beatIndex % 3 === 2) { showQRS = false; showT = false; }
     } else if (rhythm === '3rd-avb') {
         showP = false; 
-        let pPhase = (time * (80 / 60)) % 1; // P wave at independent 80 bpm
+        let pPhase = (time * (80 / 60)) % 1; // P wave เต้นแยกอิสระ 80 ครั้ง/นาที
         y += gaussian(pPhase, 6, 0.15, 0.015);
     }
 
-    // --- 4. Draw Components ---
+    // --- 4. วาดคลื่น ---
     if (showP) y += gaussian(phase, 6, pCenter, 0.015);
     
     if (showQRS) {
         y += gaussian(phase, -12, qCenter, 0.008); 
-        y += gaussian(phase, 60, rCenter, 0.01); // Normal R wave height is 60
+        y += gaussian(phase, 60, rCenter, 0.01); 
         y += gaussian(phase, -18, sCenter, 0.008); 
     }
     
     if (showT) {
-        // อัปเดต Tall Peak T ให้สูงกว่า R wave อย่างชัดเจน
-        if (rhythm === 'peak-t') y += gaussian(phase, 85, tCenter, 0.035); 
+        if (rhythm === 'peak-t') y += gaussian(phase, 85, tCenter, 0.035); // สูงทะลุ R wave
         else if (rhythm === 't-inv') y += gaussian(phase, -15, tCenter, 0.03);
+        else if (rhythm === 'svt') y += gaussian(phase, 20, tCenter, 0.025); // P+T ยอดแหลมชัดๆ
         else y += gaussian(phase, 15, tCenter, 0.03);
     }
 
@@ -156,8 +158,7 @@ function exportEKG() {
     const eCtx = exportCanvas.getContext('2d');
 
     if (state.mode === '12lead') {
-        eCtx.fillStyle = '#ffffff';
-        eCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+        eCtx.fillStyle = '#ffffff'; eCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
         eCtx.lineWidth = 1;
         for(let x = 0; x < exportCanvas.width; x += 10) {
             eCtx.beginPath(); eCtx.moveTo(x, 0); eCtx.lineTo(x, exportCanvas.height);
@@ -170,8 +171,7 @@ function exportEKG() {
             eCtx.stroke();
         }
     } else {
-        eCtx.fillStyle = '#111111';
-        eCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+        eCtx.fillStyle = '#111111'; eCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
     }
 
     eCtx.drawImage(canvas, 0, 0);
@@ -183,7 +183,7 @@ function exportEKG() {
     link.click();
 }
 
-// Rendering Engine
+// Rendering Engine (ปรับปรุงระบบนับเวลา AF Irregularity)
 function drawEKG() {
     const canvas = document.getElementById('ekg-canvas');
     const ctx = canvas.getContext('2d');
@@ -206,19 +206,37 @@ function drawEKG() {
 
         for (let i = 0; i < speed; i++) {
             state.currentX++;
-            state.time += 0.004; 
+            state.time += 0.004; // เวลามาตรฐานสำหรับ Fibrillatory Baseline
             
             if (state.currentX >= canvas.width) {
                 state.currentX = 0;
                 state.lastY = null; state.lastY_12.fill(null); state.lastY_II = null;
             }
             
-            let phase = (state.time * (hr / 60)) % 1; 
+            // การคำนวณ Phase รองรับ AF Irregular
+            let baseStep = (hr / 60) * 0.004;
+            if (mainRhythm === 'af') {
+                baseStep *= (state.phaseMultiplier || 1); // คูณตัวสุ่มให้ช้าหรือเร็ว
+            }
+
+            state.beatPhase += baseStep;
+            if (state.beatPhase >= 1) {
+                state.beatPhase -= 1;
+                state.beatIndex++;
+                if (mainRhythm === 'af') {
+                    // สุ่มความยาวของ R-R รอบถัดไป (0.6x ถึง 1.5x)
+                    state.phaseMultiplier = 0.6 + Math.random() * 0.9;
+                } else {
+                    state.phaseMultiplier = 1;
+                }
+            }
+            let phase = state.beatPhase;
+            
             ctx.clearRect(state.currentX, 0, 15, canvas.height); 
             
             if(state.mode === 'defib') {
                 ctx.strokeStyle = '#00ff00';
-                let y = (canvas.height / 2) + getECGValue(phase, mainRhythm, state.time, hr);
+                let y = (canvas.height / 2) + getECGValue(phase, mainRhythm, state.time, hr, state.beatIndex);
                 
                 if (state.currentX > 0 && state.lastY !== null) {
                     ctx.beginPath(); ctx.moveTo(state.currentX - 1, state.lastY); ctx.lineTo(state.currentX, y); ctx.stroke();
@@ -240,7 +258,7 @@ function drawEKG() {
                     let leadName = leads12[row][col];
                     let isDefect = defectLeadsList.includes('ALL') || defectLeadsList.includes(leadName);
                     let rhythmToUse = isDefect ? mainRhythm : 'nsr';
-                    let yOffset = (row * cellH) + (cellH / 2) + getECGValue(phase, rhythmToUse, state.time, hr);
+                    let yOffset = (row * cellH) + (cellH / 2) + getECGValue(phase, rhythmToUse, state.time, hr, state.beatIndex);
                     
                     if (!crossBoundary && state.currentX > 0 && state.lastY_12[row] !== null) {
                         ctx.beginPath(); ctx.moveTo(state.currentX - 1, state.lastY_12[row]); ctx.lineTo(state.currentX, yOffset); ctx.stroke();
@@ -249,7 +267,7 @@ function drawEKG() {
                 }
 
                 let isDefectII = defectLeadsList.includes('ALL') || defectLeadsList.includes('II');
-                let yOffsetII = (3 * cellH) + (cellH / 2) + getECGValue(phase, isDefectII ? mainRhythm : 'nsr', state.time, hr);
+                let yOffsetII = (3 * cellH) + (cellH / 2) + getECGValue(phase, isDefectII ? mainRhythm : 'nsr', state.time, hr, state.beatIndex);
                 if (state.currentX > 0 && state.lastY_II !== null) {
                     ctx.beginPath(); ctx.moveTo(state.currentX - 1, state.lastY_II); ctx.lineTo(state.currentX, yOffsetII); ctx.stroke();
                 }
@@ -288,6 +306,7 @@ function toggleMachine() {
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     state.currentX = 0; state.lastY = null; state.lastY_12.fill(null); state.lastY_II = null;
+    state.beatPhase = 0; // รีเซ็ตรอบใหม่
 }
 
 function setDefibMode(mode) {
