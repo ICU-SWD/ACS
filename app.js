@@ -1,7 +1,7 @@
 let state = {
     mode: '12lead', sync: false, defibMode: 'monitor', shockTimer: null, 
     currentX: 0, time: 0, lastY: null, lastY_12: Array(3).fill(null), lastY_II: null,
-    beatPhase: 0, beatIndex: 0, phaseMultiplier: 1, isPacing: false
+    beatPhase: 0, beatIndex: 0, phaseMultiplier: 1
 };
 
 const leads12 = [
@@ -178,10 +178,13 @@ function evaluateTreatment(action) {
     let msg = "";
 
     if (action === 'Pace') {
-        if (isAVBlock) {
-            isCorrect = true; msg = "เริ่มระบบ Pacing! (คำแนะนำ: จะมีสัญลักษณ์ Capture ปรากฏขึ้นบน R wave ก็ต่อเมื่อตั้งพลังงานถึง 50 mA เท่านั้น)";
+        let ma = parseInt(document.getElementById('pace-ma').value) || 0;
+        if (ma < 50) {
+            isCorrect = false; msg = "พลังงานไม่เพียงพอ! โหมด Pace ต้องหมุน Output ให้ถึง 50 mA เพื่อให้เกิด Capture ก่อนยืนยัน";
+        } else if (isAVBlock) {
+            isCorrect = true; msg = "ยอดเยี่ยม! การทำ Pacing คือการรักษาที่ถูกต้องสำหรับผู้ป่วย AV Block";
         } else {
-            isCorrect = false; msg = "เริ่มระบบ Pacing แต่นี่ไม่ใช่การรักษาหลักตาม Algorithm ของภาวะนี้";
+            isCorrect = false; msg = "เกิด Capture แล้ว แต่นี่ไม่ใช่การรักษาหลักตาม Algorithm ของภาวะนี้";
         }
         showPopup(isCorrect, msg); return;
     }
@@ -248,20 +251,6 @@ function evaluateTreatment(action) {
 }
 
 // ==== ปุ่ม Control UI ====
-function togglePacing() {
-    let btn = document.getElementById('btn-start-pace');
-    if (!state.isPacing) {
-        state.isPacing = true;
-        btn.innerText = 'Stop Pacing';
-        btn.style.background = '#d93025';
-        evaluateTreatment('Pace');
-    } else {
-        state.isPacing = false;
-        btn.innerText = 'Start Pacing';
-        btn.style.background = '#0f9d58';
-    }
-}
-
 function startShock() {
     const energy = document.getElementById('energy-select').value;
     if(state.sync) {
@@ -350,9 +339,9 @@ function drawEKG() {
         const mainRhythm = document.getElementById('rhythm-select').value;
         const defectLeadsList = getDefectiveLeads();
         
-        // Pacing Logic
+        // Pacing Logic - อ่านค่า Realtime แล้วโชว์ Capture Spike ได้เลยถ้า >= 50
         let pacingMa = parseInt(document.getElementById('pace-ma').value) || 0;
-        let showPaceCapture = (state.defibMode === 'pace' && state.isPacing && pacingMa >= 50);
+        let showPaceCapture = (state.defibMode === 'pace' && pacingMa >= 50);
 
         let speed = 2; 
         ctx.lineWidth = 2;
@@ -388,11 +377,11 @@ function drawEKG() {
                 }
                 state.lastY = y;
                 
-                // Draw Sync
+                // Draw Sync Marker
                 if(state.sync && state.defibMode !== 'pace' && phase > 0.29 && phase < 0.31) {
                     ctx.fillStyle = 'yellow'; ctx.fillRect(state.currentX, y - 30, 2, 15);
                 }
-                // Draw Pace Capture (ขีดสีฟ้าบน R Wave)
+                // Draw Pace Capture Marker (ขึ้นทันทีที่ใส่เลข >= 50)
                 if(showPaceCapture && phase > 0.295 && phase < 0.304) {
                     ctx.fillStyle = '#00ffff'; 
                     ctx.fillRect(state.currentX, y - 50, 2, 50);
@@ -424,7 +413,7 @@ function drawEKG() {
                 }
                 state.lastY_II = yOffsetII;
                 
-                // Draw Pace Capture on 12-Lead Rhythm Strip (Lead II ล่างสุด)
+                // Draw Pace Capture on Rhythm Strip (Lead II)
                 if(showPaceCapture && phase > 0.295 && phase < 0.304) {
                     ctx.fillStyle = '#00ffff'; 
                     ctx.fillRect(state.currentX, yOffsetII - 30, 2, 30);
@@ -461,11 +450,6 @@ function toggleMachine() {
         body.className = 'theme-nihon'; defibControls.style.display = 'none';
     }
     
-    // Stop pacing on mode switch to prevent bugs
-    state.isPacing = false;
-    let paceBtn = document.getElementById('btn-start-pace');
-    if(paceBtn) { paceBtn.innerText = 'Start Pacing'; paceBtn.style.background = '#0f9d58'; }
-    
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     state.currentX = 0; state.lastY = null; state.lastY_12.fill(null); state.lastY_II = null;
     state.beatPhase = 0; 
@@ -473,13 +457,6 @@ function toggleMachine() {
 
 function setDefibMode(mode) {
     state.defibMode = mode;
-    
-    if (mode !== 'pace') {
-        state.isPacing = false;
-        let paceBtn = document.getElementById('btn-start-pace');
-        if(paceBtn) { paceBtn.innerText = 'Start Pacing'; paceBtn.style.background = '#0f9d58'; }
-    }
-    
     document.getElementById('defib-sub-panel').style.display = mode === 'defib' ? 'block' : 'none';
     document.getElementById('pace-sub-panel').style.display = mode === 'pace' ? 'block' : 'none';
 }
