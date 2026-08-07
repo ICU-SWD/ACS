@@ -7,10 +7,14 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body id="app-body">
-    <!-- Pop-up แจ้งเตือนการรักษา -->
-    <div id="feedback-modal">
-        <div id="feedback-msg"></div>
-        <button onclick="closeFeedback()">ปิด</button>
+    <!-- Pop-up ประเมินผลการรักษา -->
+    <div id="feedback-modal" onclick="closePopup()">
+        <div class="modal-content" id="modal-box" onclick="event.stopPropagation()">
+            <div class="modal-icon" id="modal-icon">✅</div>
+            <h3 id="modal-title" style="margin-top:0;">ยอดเยี่ยม!</h3>
+            <p id="modal-msg" style="font-size: 15px; color: #555;">คำอธิบาย...</p>
+            <button class="btn-blue" onclick="closePopup()" style="margin-top:15px; width:100%">รับทราบ</button>
+        </div>
     </div>
 
     <div class="app-container">
@@ -89,12 +93,12 @@
             <div id="patient-summary" class="panel">
                 <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid #e1e8ed; padding-bottom: 5px; margin-bottom: 5px;">
                     <h4 style="margin: 0; color: #005bb5;">📋 สรุปอาการผู้ป่วย (Patient Summary)</h4>
-                    <button class="btn-blue btn-small" onclick="exportEKG()">📸 บันทึก EKG</button>
+                    <button class="btn-blue btn-small" onclick="exportEKG()">📸 บันทึก EKG (PNG)</button>
                 </div>
                 <div id="summary-content">กำลังโหลดข้อมูล...</div>
             </div>
 
-            <!-- มอนิเตอร์ -->
+            <!-- มอนิเตอร์ EKG -->
             <div id="monitor-display">
                 <div id="zoll-header" style="display:none;">ZOLL R Series</div>
                 <canvas id="ekg-canvas"></canvas>
@@ -123,6 +127,7 @@
                         <label>Energy (J): <input type="number" id="energy-select" min="50" max="300" step="10" value="200"></label>
                     </div>
                     <div style="text-align: center;">
+                        <!-- การกดช็อกจะส่งประเมินผลไปยังฟังก์ชัน evaluateTreatment -->
                         <button id="btn-shock" onmousedown="startShock()" onmouseup="cancelShock()" class="shock-btn">SHOCK</button>
                     </div>
                     <div id="shock-progress" style="display:none; color:#d93025; font-weight:bold; text-align:center; margin-top:10px;">Charging... Hold button!</div>
@@ -133,21 +138,24 @@
                     <div style="margin-top:10px;">
                         <label>Rate: <input type="number" id="pace-rate" value="70"></label><br>
                         <label>Output: <input type="number" id="pace-ma" value="0"> mA</label>
-                        <button class="btn-blue full-width" style="margin-top:10px;" onclick="evaluatePace()">เริ่ม Pace / อัปเดต</button>
                     </div>
+                    <!-- ปุ่มเริ่ม Pacing เพื่อประเมิน Capture -->
+                    <button class="btn-blue full-width" style="margin-top: 10px; background: #0f9d58;" onclick="evaluateTreatment('Pace')">Start Pacing</button>
                 </div>
             </div>
 
+            <!-- การรักษา -->
             <div id="interventions" style="margin-top: 20px;">
                 <h3 class="panel-title">Action & Meds</h3>
-                <button class="btn-blue full-width" onclick="triggerAction('Observe')">Observe (สังเกตอาการ)</button>
-                <button class="btn-blue full-width" onclick="triggerAction('CPR')">CPR</button>
-                <button class="btn-blue full-width" onclick="triggerAction('Adrenaline')">Adrenaline</button>
-                <button class="btn-blue full-width" onclick="triggerAction('Amiodarone')">Amiodarone</button>
-                <button class="btn-blue full-width" onclick="triggerAction('Adenosine')">Adenosine</button>
-                <button class="btn-blue full-width" onclick="triggerAction('Atropine')">Atropine</button>
-                <button class="btn-blue full-width" onclick="triggerAction('Dopamine')">Dopamine</button>
-                <button class="btn-blue full-width" onclick="triggerAction('Levophed')">Levophed</button>
+                <button class="btn-blue full-width" style="background:#444;" onclick="evaluateTreatment('Observe')">👁️ สังเกตอาการ (Observe)</button>
+                <button class="btn-blue full-width" style="background:#d93025;" onclick="evaluateTreatment('CPR')">🩸 CPR 2 mins</button>
+                <button class="btn-blue full-width" onclick="evaluateTreatment('Adrenaline')">Adrenaline</button>
+                <button class="btn-blue full-width" onclick="evaluateTreatment('Amiodarone')">Amiodarone</button>
+                <button class="btn-blue full-width" onclick="evaluateTreatment('Adenosine')">Adenosine</button>
+                <button class="btn-blue full-width" onclick="evaluateTreatment('Atropine')">Atropine</button>
+                <button class="btn-blue full-width" onclick="evaluateTreatment('Dopamine')">Dopamine</button>
+                <button class="btn-blue full-width" onclick="evaluateTreatment('Levophed')">Levophed</button>
+                <button class="btn-blue full-width" onclick="evaluateTreatment('Xylocaine')">Xylocaine</button>
             </div>
         </div>
     </div>
