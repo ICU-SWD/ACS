@@ -7,6 +7,12 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body id="app-body">
+    <!-- Pop-up แจ้งเตือนการรักษา -->
+    <div id="feedback-modal">
+        <div id="feedback-msg"></div>
+        <button onclick="closeFeedback()">ปิด</button>
+    </div>
+
     <div class="app-container">
         <!-- แผงควบคุมสำหรับ Instructor -->
         <div id="instructor-panel" class="panel blue-accent">
@@ -83,12 +89,12 @@
             <div id="patient-summary" class="panel">
                 <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid #e1e8ed; padding-bottom: 5px; margin-bottom: 5px;">
                     <h4 style="margin: 0; color: #005bb5;">📋 สรุปอาการผู้ป่วย (Patient Summary)</h4>
-                    <button class="btn-blue btn-small" onclick="exportEKG()">📸 บันทึก EKG (PNG)</button>
+                    <button class="btn-blue btn-small" onclick="exportEKG()">📸 บันทึก EKG</button>
                 </div>
                 <div id="summary-content">กำลังโหลดข้อมูล...</div>
             </div>
 
-            <!-- มอนิเตอร์ที่สามารถ Full Screen ได้ -->
+            <!-- มอนิเตอร์ -->
             <div id="monitor-display">
                 <div id="zoll-header" style="display:none;">ZOLL R Series</div>
                 <canvas id="ekg-canvas"></canvas>
@@ -97,7 +103,6 @@
                     <div class="vital-box">BP <span id="display-bp">120/80</span></div>
                     <div id="sync-status" style="display:none; color: yellow;">SYNC</div>
                 </div>
-                <!-- ปุ่มขยายเต็มจอ -->
                 <button id="fullscreen-btn" onclick="toggleFullScreen()">⛶ เต็มจอ</button>
             </div>
         </div>
@@ -128,19 +133,21 @@
                     <div style="margin-top:10px;">
                         <label>Rate: <input type="number" id="pace-rate" value="70"></label><br>
                         <label>Output: <input type="number" id="pace-ma" value="0"> mA</label>
+                        <button class="btn-blue full-width" style="margin-top:10px;" onclick="evaluatePace()">เริ่ม Pace / อัปเดต</button>
                     </div>
                 </div>
             </div>
 
             <div id="interventions" style="margin-top: 20px;">
                 <h3 class="panel-title">Action & Meds</h3>
-                <button class="btn-blue full-width" onclick="triggerAction('CPR 2 mins')">CPR 2 mins</button>
-                <button class="btn-blue full-width" onclick="triggerAction('Adrenaline 1mg')">Adrenaline 1mg</button>
-                <button class="btn-blue full-width" onclick="triggerAction('Amiodarone 300mg')">Amiodarone 300mg</button>
-                <button class="btn-blue full-width" onclick="triggerAction('Adenosine 6mg')">Adenosine 6mg</button>
+                <button class="btn-blue full-width" onclick="triggerAction('Observe')">Observe (สังเกตอาการ)</button>
+                <button class="btn-blue full-width" onclick="triggerAction('CPR')">CPR</button>
+                <button class="btn-blue full-width" onclick="triggerAction('Adrenaline')">Adrenaline</button>
+                <button class="btn-blue full-width" onclick="triggerAction('Amiodarone')">Amiodarone</button>
+                <button class="btn-blue full-width" onclick="triggerAction('Adenosine')">Adenosine</button>
+                <button class="btn-blue full-width" onclick="triggerAction('Atropine')">Atropine</button>
                 <button class="btn-blue full-width" onclick="triggerAction('Dopamine')">Dopamine</button>
                 <button class="btn-blue full-width" onclick="triggerAction('Levophed')">Levophed</button>
-                <button class="btn-blue full-width" onclick="triggerAction('Xylocaine')">Xylocaine</button>
             </div>
         </div>
     </div>
